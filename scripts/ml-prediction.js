@@ -17,31 +17,48 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 // Technical indicators calculation
 function calculateRSI(prices, period = 14) {
+    if (prices.length < period + 1) {
+        return 50; // Default value if not enough data
+    }
+
     const changes = prices.slice(1).map((price, i) => price - prices[i]);
     const gains = changes.map(change => change > 0 ? change : 0);
     const losses = changes.map(change => change < 0 ? -change : 0);
     
-    const avgGain = gains.slice(-period).reduce((a, b) => a + b) / period;
-    const avgLoss = losses.slice(-period).reduce((a, b) => a + b) / period;
+    const avgGain = gains.slice(-period).reduce((a, b) => a + b, 0) / period;
+    const avgLoss = losses.slice(-period).reduce((a, b) => a + b, 0) / period;
     
+    if (avgLoss === 0) return 100;
     const rs = avgGain / avgLoss;
     return 100 - (100 / (1 + rs));
 }
 
 function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
-    const fastEMA = prices.slice(-fastPeriod).reduce((a, b) => a + b) / fastPeriod;
-    const slowEMA = prices.slice(-slowPeriod).reduce((a, b) => a + b) / slowPeriod;
+    if (prices.length < slowPeriod) {
+        return { macd: 0, signal: 0, histogram: 0 };
+    }
+
+    const fastEMA = prices.slice(-fastPeriod).reduce((a, b) => a + b, 0) / fastPeriod;
+    const slowEMA = prices.slice(-slowPeriod).reduce((a, b) => a + b, 0) / slowPeriod;
     const macd = fastEMA - slowEMA;
-    const signal = prices.slice(-signalPeriod).reduce((a, b) => a + b) / signalPeriod;
+    const signal = prices.slice(-signalPeriod).reduce((a, b) => a + b, 0) / signalPeriod;
     const histogram = macd - signal;
     
     return { macd, signal, histogram };
 }
 
 function calculateBollingerBands(prices, period = 20, stdDev = 2) {
-    const sma = prices.slice(-period).reduce((a, b) => a + b) / period;
+    if (prices.length < period) {
+        return {
+            upper: prices[prices.length - 1],
+            middle: prices[prices.length - 1],
+            lower: prices[prices.length - 1]
+        };
+    }
+
+    const sma = prices.slice(-period).reduce((a, b) => a + b, 0) / period;
     const squaredDiffs = prices.slice(-period).map(price => Math.pow(price - sma, 2));
-    const variance = squaredDiffs.reduce((a, b) => a + b) / period;
+    const variance = squaredDiffs.reduce((a, b) => a + b, 0) / period;
     const standardDeviation = Math.sqrt(variance);
     
     return {
