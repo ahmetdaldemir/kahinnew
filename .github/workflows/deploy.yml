@@ -69,7 +69,7 @@ jobs:
           npm run init-db
           
           # PM2 ile PORT=3200 üzerinden uygulamayı başlat
-          pm2 delete kahin || true
-          PORT=3200 pm2 start server.js --name kahin
+          pm2 delete kahinnew || true
+          PORT=3200 pm2 start server.js --name kahinnew
         debug: true
         use_insecure_cipher: true
