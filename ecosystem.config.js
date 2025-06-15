@@ -8,7 +8,9 @@ module.exports = {
     max_memory_restart: '1G',
     env: {
       NODE_ENV: 'production',
-      PORT: 3200
+      PORT: 3200,
+      BINANCE_API_KEY: 'xxx',
+      BINANCE_API_SECRET: 'yyy'
     }
   }]
 };
