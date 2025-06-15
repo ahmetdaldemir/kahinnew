@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Binance } = require('ccxt');
+const ccxt = require('ccxt');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
@@ -7,7 +7,7 @@ const path = require('path');
 const db = new sqlite3.Database(path.join(__dirname, '..', process.env.DB_PATH));
 
 // Initialize Binance client
-const binance = new Binance({
+const binance = new ccxt.binance({
     apiKey: process.env.BINANCE_API_KEY,
     secret: process.env.BINANCE_API_SECRET,
     enableRateLimit: true
@@ -32,9 +32,8 @@ async function fetchHistoricalData(symbol) {
         console.log(`Fetching data for ${symbol} from ${startDate.toISOString()} to ${endDate.toISOString()}`);
         
         const timeframe = process.env.DEFAULT_TIMEFRAME;
-        const limit = parseInt(process.env.DEFAULT_LIMIT);
-        
-        const ohlcv = await binance.fetchOHLCV(symbol, timeframe, undefined, limit);
+        let since = startDate.getTime();
+        const endTimestamp = endDate.getTime();
         
         // Prepare data for insertion
         const stmt = db.prepare(`
@@ -45,30 +44,45 @@ async function fetchHistoricalData(symbol) {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
-        for (const candle of ohlcv) {
-            const [timestamp, open, high, low, close, volume] = candle;
+        while (since < endTimestamp) {
+            console.log(`Fetching data for ${symbol} from ${new Date(since).toISOString()}`);
+            const ohlcv = await binance.fetchOHLCV(symbol, timeframe, since);
             
-            // Calculate technical indicators
-            const rsi = calculateRSI(ohlcv, 14);
-            const { macd, signal, histogram } = calculateMACD(ohlcv);
-            const { upper, middle, lower } = calculateBollingerBands(ohlcv, 20, 2);
+            if (ohlcv.length === 0) {
+                break;
+            }
 
-            stmt.run(
-                symbol,
-                new Date(timestamp).toISOString(),
-                open,
-                high,
-                low,
-                close,
-                volume,
-                rsi,
-                macd,
-                signal,
-                histogram,
-                upper,
-                middle,
-                lower
-            );
+            for (const candle of ohlcv) {
+                const [timestamp, open, high, low, close, volume] = candle;
+                
+                // Calculate technical indicators
+                const rsi = calculateRSI(ohlcv, 14);
+                const { macd, signal, histogram } = calculateMACD(ohlcv);
+                const { upper, middle, lower } = calculateBollingerBands(ohlcv, 20, 2);
+
+                stmt.run(
+                    symbol,
+                    new Date(timestamp).toISOString(),
+                    open,
+                    high,
+                    low,
+                    close,
+                    volume,
+                    rsi,
+                    macd,
+                    signal,
+                    histogram,
+                    upper,
+                    middle,
+                    lower
+                );
+            }
+
+            // Update since timestamp for next iteration
+            since = ohlcv[ohlcv.length - 1][0] + 1;
+            
+            // Add a small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         stmt.finalize();

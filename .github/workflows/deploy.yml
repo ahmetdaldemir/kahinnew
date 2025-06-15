@@ -67,8 +67,8 @@ jobs:
           # Veritabanını başlat
           npm run init-db
           
-          # Uygulamayı başlat
+          # PM2 ile PORT=3200 üzerinden uygulamayı başlat
           pm2 delete kahin || true
-          pm2 start index.js --name kahin
+          PORT=3200 pm2 start index.js --name kahin
         debug: true
         use_insecure_cipher: true
