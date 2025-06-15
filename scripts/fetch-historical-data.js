@@ -2,9 +2,25 @@ require('dotenv').config();
 const ccxt = require('ccxt');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
+
+// Create data directory if it doesn't exist
+const dbDir = path.join(__dirname, '..', 'data');
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+}
 
 // Database connection
-const db = new sqlite3.Database(path.join(__dirname, '..', process.env.DB_PATH));
+const dbPath = path.join(dbDir, 'crypto_analyzer.db');
+console.log('Database path:', dbPath);
+
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Error connecting to database:', err);
+        process.exit(1);
+    }
+    console.log('Connected to database successfully');
+});
 
 // Initialize Binance client
 const binance = new ccxt.binance({
@@ -37,7 +53,7 @@ async function fetchHistoricalData(symbol) {
         
         // Prepare data for insertion
         const stmt = db.prepare(`
-            INSERT INTO historical_data (
+            INSERT OR IGNORE INTO historical_data (
                 symbol, timestamp, open, high, low, close, volume,
                 rsi, macd, macd_signal, macd_histogram,
                 bb_upper, bb_middle, bb_lower
