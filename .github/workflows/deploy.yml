@@ -27,7 +27,6 @@ jobs:
         echo "BINANCE_API_KEY=3zsP3b4WgikgXnRjspYuSLisJrePhH4XAL7ptjYWeykzNq7RDnRx8ZoegDDvZlMb" >> .env
         echo "BINANCE_API_SECRET=lS282ERiqgVYC7EXCAIxRp81X0oOMEYqEku8r9LbV1RH6Ub6EytE9tirrfE7QQCW" >> .env
     
-    
     - name: Install PM2
       run: npm install -g pm2
     
@@ -41,7 +40,7 @@ jobs:
         target: "/var/www/html/kahin"
         strip_components: 0
         debug: true
-    
+
     - name: Deploy to Server
       uses: appleboy/ssh-action@master
       with:
@@ -49,17 +48,18 @@ jobs:
         username: root
         password: '@198711Ad@'
         script: |
-          # Gerekli yazılımları kontrol et ve yükle
+          # Node.js kurulu değilse kur
           if ! command -v node &> /dev/null; then
             curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
             yum install -y nodejs
           fi
           
+          # PM2 kurulu değilse kur
           if ! command -v pm2 &> /dev/null; then
             npm install -g pm2
           fi
           
-          # Uygulama dizinine git
+          # Proje dizinine git
           cd /var/www/html/kahin
           
           # Bağımlılıkları yükle
@@ -68,8 +68,9 @@ jobs:
           # Veritabanını başlat
           npm run init-db
           
-          # PM2 ile PORT=3200 üzerinden uygulamayı başlat
+          # PM2 ile uygulamayı ecosystem üzerinden başlat
           pm2 delete kahinnew || true
-          PORT=3200 pm2 start server.js --name kahinnew
+          pm2 start ecosystem.config.js
+          pm2 save
         debug: true
         use_insecure_cipher: true

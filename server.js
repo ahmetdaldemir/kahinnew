@@ -1,53 +1,10 @@
 const express = require('express');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
-const { spawn, execSync } = require('child_process');
+const { spawn, execSync, exec } = require('child_process');
 
 const app = express();
 const port = process.env.PORT || 3200;
-
-
-(async function autoSetupAndStartServer() {
-    const dbPath = path.join(__dirname, 'data', 'crypto_analyzer.db');
-    const db = new sqlite3.Database(dbPath);
-
-    // 1. Veritabanı oluştur
-    await runScriptAsync('node init-db.js');
-
-    // 2. Veri var mı kontrol et
-    const hasData = await new Promise((resolve, reject) => {
-        db.get('SELECT COUNT(*) as cnt FROM historical_data', (err, row) => {
-            if (!err && row && row.cnt > 0) {
-                resolve(true);
-            } else {
-                resolve(false);
-            }
-        });
-    });
-
-    // 3. Veri eksikse çek
-    if (!hasData) {
-        await runScriptAsync('node scripts/fetch-historical-data.js');
-    }
-
-    // 4. ML tahminlerini çalıştır
-    await runScriptAsync('node scripts/ml-prediction.js');
-
-    // 5. Express server'ı başlat
-    startExpressServer();
-})();
-
-// Yardımcı: senkron değil, promisified
-function runScriptAsync(command) {
-    return new Promise((resolve, reject) => {
-        console.log(`Çalıştırılıyor: ${command}`);
-        const process = spawn('bash', ['-c', command], { stdio: 'inherit' });
-        process.on('exit', code => {
-            if (code === 0) resolve();
-            else reject(new Error(`Komut başarısız: ${command}`));
-        });
-    });
-}
 
 // Yardımcı fonksiyon: Scripti senkron çalıştır
 function runScriptSync(command) {
@@ -56,6 +13,16 @@ function runScriptSync(command) {
         execSync(command, { stdio: 'inherit' });
     } catch (err) {
         console.error(`Hata: ${command}`, err.message);
+    }
+}
+
+// Yardımcı fonksiyon: Scripti async başlat (arka planda)
+function runScriptAsync(command) {
+    try {
+        console.log(`Arka planda başlatılıyor: ${command}`);
+        spawn(command.split(' ')[0], command.split(' ').slice(1), { stdio: 'inherit', detached: true });
+    } catch (err) {
+        console.error(`Arka plan script hatası: ${command}`, err.message);
     }
 }
 
@@ -75,13 +42,16 @@ function autoSetupAndStartServer() {
             } else {
                 runScriptSync('node scripts/fetch-historical-data.js');
             }
-            // 3. ML tahminleri oluştur
+            // 3. Anlık verileri çek
+            runScriptSync('node scripts/fetch-realtime-data.js');
+            // 4. ML tahminleri oluştur
             runScriptSync('node scripts/ml-prediction.js');
-            // 4. Express sunucusunu başlat
+            // 5. Express sunucusunu başlat
             startExpressServer();
         });
     } catch (e) {
         runScriptSync('node scripts/fetch-historical-data.js');
+        runScriptSync('node scripts/fetch-realtime-data.js');
         runScriptSync('node scripts/ml-prediction.js');
         startExpressServer();
     }
@@ -102,15 +72,14 @@ function startExpressServer() {
     // Main dashboard route
     app.get('/', async (req, res) => {
         try {
-            // Son 24 saatlik fiyat değişimini hesaplamak için yardımcı fonksiyon
+            // Her coin için son 24 saatlik değişimi hesapla
             function get24hChange(symbol) {
                 return new Promise((resolve, reject) => {
                     db.all(
-                        `SELECT price, timestamp FROM historical_data WHERE symbol = ? ORDER BY timestamp DESC LIMIT 24`,
+                        `SELECT price FROM historical_data WHERE symbol = ? ORDER BY timestamp DESC LIMIT 24`,
                         [symbol],
                         (err, rows) => {
-                            if (err) return resolve(0);
-                            if (rows.length < 2) return resolve(0);
+                            if (err || rows.length < 2) return resolve(0);
                             const latest = parseFloat(rows[0].price);
                             const oldest = parseFloat(rows[rows.length - 1].price);
                             const change = ((latest - oldest) / oldest) * 100;
@@ -120,7 +89,7 @@ function startExpressServer() {
                 });
             }
 
-            // Tüm coinler için son tahminleri çek
+            // prediction_performance tablosundan son tahminleri çek
             const predictions = await new Promise((resolve, reject) => {
                 db.all(
                     `SELECT symbol, confidence, predicted_signal, profit_loss, actual_price FROM prediction_performance
@@ -183,9 +152,24 @@ function startExpressServer() {
         });
     });
 
-    app.listen(port,'0.0.0.0', () => {
+    app.listen(port, () => {
         console.log(`Server running at http://localhost:${port}`);
     });
+
+    // Sunucu çalışırken her 10 dakikada bir anlık veri ve ML tahmini güncelle
+    setInterval(() => {
+        exec('node scripts/fetch-realtime-data.js', (err) => {
+            if (err) {
+                console.error('fetch-realtime-data.js hata:', err.message);
+            } else {
+                exec('node scripts/ml-prediction.js', (err2) => {
+                    if (err2) {
+                        console.error('ml-prediction.js hata:', err2.message);
+                    }
+                });
+            }
+        });
+    }, 10 * 60 * 1000); // 10 dakika
 }
 
 // Otomasyon başlat

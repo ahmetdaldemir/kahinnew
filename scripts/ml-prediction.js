@@ -166,7 +166,7 @@ async function trainModel(features, labels) {
         units: 16,
         activation: 'relu',
         inputShape: [features[0].length],
-        kernelRegularizer: tf.regularizers.l2(0.01) // L2 regularization
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }) // L2 regularization
     }));
     
     // Hidden layer
@@ -174,7 +174,7 @@ async function trainModel(features, labels) {
     model.add(tf.layers.dense({
         units: 8,
         activation: 'relu',
-        kernelRegularizer: tf.regularizers.l2(0.01) // L2 regularization
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }) // L2 regularization
     }));
     
     // Output layer
