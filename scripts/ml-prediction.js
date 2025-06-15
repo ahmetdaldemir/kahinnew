@@ -295,7 +295,7 @@ async function main() {
             try {
                 console.log(`\nAnalyzing ${symbol}...`);
                 const result = await generatePredictions(symbol);
-                if (result && result.confidence >= 10 && result.profit >= 5) {
+                if (result) {
                     results.push(result);
                 }
             } catch (error) {
@@ -326,15 +326,19 @@ async function main() {
         `);
 
         for (const result of topResults) {
-            stmt.run(
-                result.symbol,
-                new Date().toISOString(),
-                result.signal,
-                result.confidence,
-                result.currentPrice,
-                result.predictedPrice,
-                result.profit
-            );
+            try {
+                stmt.run(
+                    result.symbol,
+                    new Date().toISOString(),
+                    result.signal,
+                    result.confidence,
+                    result.currentPrice,
+                    result.predictedPrice,
+                    result.profit
+                );
+            } catch (e) {
+                console.error('DB kayıt hatası:', e.message);
+            }
         }
 
         stmt.finalize();
