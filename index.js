@@ -136,7 +136,7 @@ console.log('Starting initial data collection...');
 collectAndAnalyzeData();
 
 // Sunucuyu başlat
-app.listen(port, '0.0.0.0', () => {
+app.listen(3200, '0.0.0.0', () => {
     console.log(`Server is running on port ${port}`);
     console.log(`Health check available at http://localhost:${port}/health`);
 });
