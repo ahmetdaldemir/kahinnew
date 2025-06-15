@@ -27,17 +27,6 @@ jobs:
         echo "BINANCE_API_KEY=3zsP3b4WgikgXnRjspYuSLisJrePhH4XAL7ptjYWeykzNq7RDnRx8ZoegDDvZlMb" >> .env
         echo "BINANCE_API_SECRET=lS282ERiqgVYC7EXCAIxRp81X0oOMEYqEku8r9LbV1RH6Ub6EytE9tirrfE7QQCW" >> .env
     
-    - name: Initialize Database
-      run: npm run init-db
-    
-    - name: Fetch Historical Data
-      run: npm run fetch-historical
-    
-    - name: Fetch Real-time Data
-      run: npm run fetch-realtime
-    
-    - name: Run Machine Learning Predictions
-      run: node scripts/ml-prediction.js
     
     - name: Install PM2
       run: npm install -g pm2
@@ -81,6 +70,6 @@ jobs:
           
           # PM2 ile PORT=3200 üzerinden uygulamayı başlat
           pm2 delete kahin || true
-          PORT=3200 pm2 start index.js --name kahin
+          PORT=3200 pm2 start server.js --name kahin
         debug: true
         use_insecure_cipher: true

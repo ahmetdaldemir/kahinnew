@@ -95,16 +95,16 @@ function prepareData(data) {
     console.log('Preparing data for ML model...');
     
     // Calculate additional features
-    const prices = data.map(row => parseFloat(row.close));
+    const prices = data.map(row => parseFloat(row.price));
     const volumes = data.map(row => parseFloat(row.volume));
     
     const features = data.map((row, index) => {
-        const price = parseFloat(row.close);
+        const price = parseFloat(row.price);
         const volume = parseFloat(row.volume);
         
         // Price momentum
-        const priceChange = index > 0 ? price - parseFloat(data[index - 1].close) : 0;
-        const priceChangePercent = index > 0 ? (priceChange / parseFloat(data[index - 1].close)) * 100 : 0;
+        const priceChange = index > 0 ? price - parseFloat(data[index - 1].price) : 0;
+        const priceChangePercent = index > 0 ? (priceChange / parseFloat(data[index - 1].price)) * 100 : 0;
         
         // Volume momentum
         const volumeChange = index > 0 ? volume - parseFloat(data[index - 1].volume) : 0;
@@ -116,9 +116,6 @@ function prepareData(data) {
         const { upper, middle, lower } = calculateBollingerBands(prices.slice(0, index + 1));
         
         return [
-            parseFloat(row.open),
-            parseFloat(row.high),
-            parseFloat(row.low),
             price,
             volume,
             priceChange,
@@ -135,42 +132,49 @@ function prepareData(data) {
         ];
     });
 
+    // Normalize features
+    const normalizedFeatures = features.map(feature => normalizeData(feature));
+
     // Create labels based on future price movement
     const labels = data.map((row, index) => {
         if (index >= data.length - 1) return 0;
-        const currentPrice = parseFloat(row.close);
-        const futurePrice = parseFloat(data[index + 1].close);
+        const currentPrice = parseFloat(row.price);
+        const futurePrice = parseFloat(data[index + 1].price);
         return futurePrice > currentPrice ? 1 : 0;
     });
 
-    console.log(`Prepared ${features.length} samples for training`);
-    return { features, labels };
+    console.log(`Prepared ${normalizedFeatures.length} samples for training`);
+    return { features: normalizedFeatures, labels };
+}
+
+// Normalize data
+function normalizeData(data) {
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    return data.map(x => (x - min) / (max - min));
 }
 
 // Train ML model
 async function trainModel(features, labels) {
     console.log('Training ML model...');
     
-    // Create a more complex model
+    // Create a simplified model
     const model = tf.sequential();
     
     // Input layer
     model.add(tf.layers.dense({
-        units: 32,
+        units: 16,
         activation: 'relu',
-        inputShape: [features[0].length]
+        inputShape: [features[0].length],
+        kernelRegularizer: tf.regularizers.l2(0.01) // L2 regularization
     }));
     
-    // Hidden layers
-    model.add(tf.layers.dropout(0.2));
-    model.add(tf.layers.dense({
-        units: 16,
-        activation: 'relu'
-    }));
+    // Hidden layer
     model.add(tf.layers.dropout(0.2));
     model.add(tf.layers.dense({
         units: 8,
-        activation: 'relu'
+        activation: 'relu',
+        kernelRegularizer: tf.regularizers.l2(0.01) // L2 regularization
     }));
     
     // Output layer
@@ -179,9 +183,9 @@ async function trainModel(features, labels) {
         activation: 'sigmoid'
     }));
     
-    // Compile model
+    // Compile model with a lower learning rate
     model.compile({
-        optimizer: tf.train.adam(0.001),
+        optimizer: tf.train.adam(0.0001),
         loss: 'binaryCrossentropy',
         metrics: ['accuracy']
     });
@@ -190,20 +194,28 @@ async function trainModel(features, labels) {
     const xs = tf.tensor2d(features);
     const ys = tf.tensor2d(labels, [labels.length, 1]);
 
+    // Early stopping callback
+    const earlyStopping = tf.callbacks.earlyStopping({
+        monitor: 'val_loss',
+        patience: 5,
+        restoreBestWeights: true
+    });
+
     // Train model
     await model.fit(xs, ys, {
         epochs: 50,
         batchSize: 32,
         validationSplit: 0.2,
         verbose: 1,
-        callbacks: {
-            onEpochEnd: (epoch, logs) => {
-                console.log(`Epoch ${epoch + 1}: loss = ${logs.loss.toFixed(4)}, accuracy = ${logs.acc.toFixed(4)}, val_loss = ${logs.val_loss.toFixed(4)}, val_acc = ${logs.val_acc.toFixed(4)}`);
-            }
-        }
+        callbacks: [earlyStopping]
     });
     
     console.log('Model training completed');
+
+    // Save model weights to data folder
+    await model.save('file://./data/model-weights');
+    console.log('Model weights saved to data folder');
+
     return model;
 }
 
@@ -230,7 +242,7 @@ async function generatePredictions(symbol) {
             signal: confidence > 0.5 ? 'BUY' : 'SELL',
             confidence: (confidence * 100).toFixed(2),
             profit: calculateProfit(data).toFixed(2),
-            currentPrice: parseFloat(data[data.length - 1].close).toFixed(2),
+            currentPrice: parseFloat(data[data.length - 1].price).toFixed(2),
             priceChange24h: calculatePriceChange(data, 24).toFixed(2),
             volume24h: calculateVolume24h(data).toFixed(2)
         };
@@ -245,15 +257,15 @@ async function generatePredictions(symbol) {
 
 // Calculate profit
 function calculateProfit(data) {
-    const lastPrice = parseFloat(data[data.length - 1].close);
-    const firstPrice = parseFloat(data[0].close);
+    const lastPrice = parseFloat(data[data.length - 1].price);
+    const firstPrice = parseFloat(data[0].price);
     return ((lastPrice - firstPrice) / firstPrice) * 100;
 }
 
 // Calculate 24h price change
 function calculatePriceChange(data, hours) {
-    const currentPrice = parseFloat(data[data.length - 1].close);
-    const pastPrice = parseFloat(data[Math.max(0, data.length - hours)].close);
+    const currentPrice = parseFloat(data[data.length - 1].price);
+    const pastPrice = parseFloat(data[Math.max(0, data.length - hours)].price);
     return ((currentPrice - pastPrice) / pastPrice) * 100;
 }
 
