@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
 const { spawn, execSync, exec } = require('child_process');
+const { query } = require('./db');
 
 const app = express();
 const port = process.env.PORT || 3200;
@@ -27,32 +27,30 @@ function runScriptAsync(command) {
 }
 
 // Otomasyon: Veritabanı, veri ve ML tahminleri kontrolü
-function autoSetupAndStartServer() {
-    // 1. Veritabanı ve tablo kontrolü/oluşturulması
-    runScriptSync('node init-db.js');
-
-    // 2. Veri var mı kontrol et, yoksa çek
-    let hasData = false;
+async function autoSetupAndStartServer() {
     try {
-        const dbPath = path.join(__dirname, 'data', 'crypto_analyzer.db');
-        const db = new sqlite3.Database(dbPath);
-        db.get('SELECT COUNT(*) as cnt FROM historical_data', (err, row) => {
-            if (!err && row && row.cnt > 0) {
-                hasData = true;
-            } else {
-                runScriptSync('node scripts/fetch-historical-data.js');
-            }
-            // 3. Anlık verileri çek
-            runScriptSync('node scripts/fetch-realtime-data.js');
-            // 4. ML tahminleri oluştur
-            runScriptSync('node scripts/ml-prediction.js');
-            // 5. Express sunucusunu başlat
-            startExpressServer();
-        });
-    } catch (e) {
-        runScriptSync('node scripts/fetch-historical-data.js');
+        // 1. Veritabanı ve tablo kontrolü/oluşturulması
+        runScriptSync('node init-db.js');
+
+        // 2. Veri var mı kontrol et, yoksa çek
+        const result = await query('SELECT COUNT(*) as cnt FROM historical_data');
+        const hasData = result[0].cnt > 0;
+
+        if (!hasData) {
+            runScriptSync('node scripts/fetch-historical-data.js');
+        }
+
+        // 3. Anlık verileri çek
         runScriptSync('node scripts/fetch-realtime-data.js');
+        
+        // 4. ML tahminleri oluştur
         runScriptSync('node scripts/ml-prediction.js');
+        
+        // 5. Express sunucusunu başlat
+        startExpressServer();
+    } catch (error) {
+        console.error('Otomasyon hatası:', error);
+        // Hata durumunda da sunucuyu başlat
         startExpressServer();
     }
 }
@@ -62,10 +60,6 @@ function startExpressServer() {
     app.set('view engine', 'ejs');
     app.set('views', path.join(__dirname, 'views'));
 
-    // Database connection
-    const dbPath = path.join(__dirname, 'data', 'crypto_analyzer.db');
-    const db = new sqlite3.Database(dbPath);
-
     // Serve static files
     app.use(express.static('public'));
 
@@ -73,31 +67,23 @@ function startExpressServer() {
     app.get('/', async (req, res) => {
         try {
             // Her coin için son 24 saatlik değişimi hesapla
-            function get24hChange(symbol) {
-                return new Promise((resolve, reject) => {
-                    db.all(
-                        `SELECT price FROM historical_data WHERE symbol = ? ORDER BY timestamp DESC LIMIT 24`,
-                        [symbol],
-                        (err, rows) => {
-                            if (err || rows.length < 2) return resolve(0);
-                            const latest = parseFloat(rows[0].price);
-                            const oldest = parseFloat(rows[rows.length - 1].price);
-                            const change = ((latest - oldest) / oldest) * 100;
-                            resolve(change);
-                        }
-                    );
-                });
+            async function get24hChange(symbol) {
+                const rows = await query(
+                    `SELECT price FROM historical_data WHERE symbol = ? ORDER BY timestamp DESC LIMIT 24`,
+                    [symbol]
+                );
+                if (rows.length < 2) return 0;
+                const latest = parseFloat(rows[0].price);
+                const oldest = parseFloat(rows[rows.length - 1].price);
+                return ((latest - oldest) / oldest) * 100;
             }
 
             // prediction_performance tablosundan son tahminleri çek
-            const predictions = await new Promise((resolve, reject) => {
-                db.all(
-                    `SELECT symbol, confidence, predicted_signal, profit_loss, actual_price FROM prediction_performance
-                     WHERE prediction_date = (SELECT MAX(prediction_date) FROM prediction_performance)
-                     ORDER BY symbol`,
-                    (err, rows) => err ? reject(err) : resolve(rows)
-                );
-            });
+            const predictions = await query(
+                `SELECT symbol, confidence, predicted_signal, profit_loss, actual_price FROM prediction_performance
+                 WHERE prediction_date = (SELECT MAX(prediction_date) FROM prediction_performance)
+                 ORDER BY symbol`
+            );
 
             // Her coin için 24s değişimi ekle
             for (const pred of predictions) {

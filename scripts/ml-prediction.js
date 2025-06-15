@@ -1,19 +1,7 @@
 require('dotenv').config();
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 const tf = require('@tensorflow/tfjs-node');
-
-// Database connection
-const dbPath = path.join(__dirname, '..', 'data', 'crypto_analyzer.db');
-console.log('Database path:', dbPath);
-
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error connecting to database:', err);
-        process.exit(1);
-    }
-    console.log('Connected to database successfully');
-});
+const { query } = require('../db');
+const moment = require('moment');
 
 // Technical indicators calculation
 function calculateRSI(prices, period = 14) {
@@ -69,21 +57,12 @@ function calculateBollingerBands(prices, period = 20, stdDev = 2) {
 }
 
 // Fetch data from database
-function fetchData(symbol) {
-    return new Promise((resolve, reject) => {
-        const query = `SELECT * FROM historical_data WHERE symbol = ? ORDER BY timestamp`;
-        console.log(`Fetching data for ${symbol}...`);
-        
-        db.all(query, [symbol], (err, rows) => {
-            if (err) {
-                console.error(`Error fetching data for ${symbol}:`, err);
-                reject(err);
-            } else {
-                console.log(`Fetched ${rows.length} records for ${symbol}`);
-                resolve(rows);
-            }
-        });
-    });
+async function fetchData(symbol) {
+    const rows = await query(
+        `SELECT * FROM historical_data WHERE symbol = ? ORDER BY timestamp`,
+        [symbol]
+    );
+    return rows;
 }
 
 // Prepare data for ML model
@@ -243,10 +222,12 @@ async function generatePredictions(symbol) {
             confidence: (confidence * 100).toFixed(2),
             profit: calculateProfit(data).toFixed(2),
             currentPrice: parseFloat(data[data.length - 1].price).toFixed(2),
+            predictedPrice: parseFloat(data[data.length - 1].price).toFixed(2),
             priceChange24h: calculatePriceChange(data, 24).toFixed(2),
             volume24h: calculateVolume24h(data).toFixed(2)
         };
 
+        console.log('DB kayıt:', result);
         console.log(`Prediction for ${symbol}:`, result);
         return result;
     } catch (error) {
@@ -280,26 +261,20 @@ async function main() {
         console.log('Starting ML prediction process...');
         
         // Get all available symbols from coin_pairs table
-        const symbols = await new Promise((resolve, reject) => {
-            db.all('SELECT symbol FROM coin_pairs', (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows.map(row => row.symbol));
-            });
-        });
-
-        console.log(`Found ${symbols.length} symbols to analyze`);
+        const pairs = await query('SELECT symbol FROM coin_pairs');
+        console.log(`Found ${pairs.length} symbols to analyze`);
         const results = [];
 
         // Process each symbol
-        for (const symbol of symbols) {
+        for (const row of pairs) {
             try {
-                console.log(`\nAnalyzing ${symbol}...`);
-                const result = await generatePredictions(symbol);
+                console.log(`\nAnalyzing ${row.symbol}...`);
+                const result = await generatePredictions(row.symbol);
                 if (result) {
                     results.push(result);
                 }
             } catch (error) {
-                console.error(`Error analyzing ${symbol}:`, error);
+                console.error(`Error analyzing ${row.symbol}:`, error);
                 continue;
             }
         }
@@ -318,35 +293,32 @@ async function main() {
         console.table(topResults);
 
         // Save predictions to database
-        const stmt = db.prepare(`
-            INSERT INTO prediction_performance (
-                symbol, prediction_date, predicted_signal, confidence, 
-                actual_price, predicted_price, profit_loss
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-
         for (const result of topResults) {
             try {
-                stmt.run(
-                    result.symbol,
-                    new Date().toISOString(),
-                    result.signal,
-                    result.confidence,
-                    result.currentPrice,
-                    result.predictedPrice,
-                    result.profit
+                await query(
+                    `INSERT INTO prediction_performance (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE predicted_signal=VALUES(predicted_signal), confidence=VALUES(confidence), actual_price=VALUES(actual_price), predicted_price=VALUES(predicted_price), profit_loss=VALUES(profit_loss)`,
+                    [
+                        result.symbol,
+                        moment().format('YYYY-MM-DD HH:mm:ss'),
+                        result.signal,
+                        result.confidence,
+                        result.currentPrice,
+                        result.predictedPrice,
+                        result.profit
+                    ]
                 );
             } catch (e) {
                 console.error('DB kayıt hatası:', e.message);
             }
         }
 
-        stmt.finalize();
         console.log('Predictions saved to database');
+        process.exit(0);
     } catch (error) {
         console.error('Error in main process:', error);
-    } finally {
-        db.close();
+        process.exit(1);
     }
 }
 
