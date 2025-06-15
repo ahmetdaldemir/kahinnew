@@ -28,3 +28,7 @@ coverage/
 model/
 *.json
 *.bin
+
+
+crypto-data.db
+data/
