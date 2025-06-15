@@ -19,76 +19,131 @@
         .sell {
             border-left: 4px solid #dc3545;
         }
+        .chart-container {
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        .score-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body class="bg-light">
     <nav class="navbar navbar-dark bg-dark">
         <div class="container">
             <span class="navbar-brand mb-0 h1">Crypto Analyzer</span>
+            <button class="btn btn-outline-light" onclick="runPredictions()">Run New Analysis</button>
         </div>
     </nav>
 
     <div class="container mt-4">
-        <div class="row">
-            <div class="col-md-12 mb-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Price Chart</h5>
-                        <canvas id="priceChart"></canvas>
-                    </div>
-                </div>
+        <!-- Top 5 Coins Charts -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3>Top 5 Coins by Score</h3>
             </div>
-        </div>
-
-        <div class="row">
-            <% predictions.forEach(function(prediction) { %>
-                <div class="col-md-4 mb-4">
-                    <div class="card prediction-card <%= prediction.signal.toLowerCase() %>">
+            <% topCoins.forEach(function(coin) { %>
+                <div class="col-md-6 mb-4">
+                    <div class="card">
                         <div class="card-body">
-                            <h5 class="card-title"><%= prediction.symbol %></h5>
-                            <p class="card-text">
-                                <strong>Signal:</strong> <span class="badge bg-<%= prediction.signal === 'BUY' ? 'success' : 'danger' %>"><%= prediction.signal %></span><br>
-                                <strong>Confidence:</strong> <%= prediction.confidence %>%<br>
-                                <strong>Current Price:</strong> $<%= prediction.currentPrice %><br>
-                                <strong>24h Change:</strong> <span class="<%= prediction.priceChange24h >= 0 ? 'text-success' : 'text-danger' %>"><%= prediction.priceChange24h %>%</span><br>
-                                <strong>24h Volume:</strong> $<%= prediction.volume24h %>
-                            </p>
+                            <h5 class="card-title"><%= coin.symbol %></h5>
+                            <div class="chart-container">
+                                <canvas id="chart_<%= coin.symbol.replace('/', '_') %>"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
             <% }); %>
         </div>
+
+        <!-- Predictions Grid -->
+        <div class="row">
+            <div class="col-12 mb-4">
+                <h3>Top 50 Predictions</h3>
+                <div class="row">
+                    <% predictions.forEach(function(prediction) { %>
+                        <div class="col-md-4 col-lg-3 mb-4">
+                            <div class="card prediction-card <%= prediction.predicted_signal.toLowerCase() %>">
+                                <div class="card-body">
+                                    <span class="badge bg-primary score-badge">
+                                        Score: <%= ((prediction.confidence * 0.7) + (prediction.profit_loss * 0.3)).toFixed(1) %>
+                                    </span>
+                                    <h5 class="card-title"><%= prediction.symbol %></h5>
+                                    <p class="card-text">
+                                        <strong>Signal:</strong> 
+                                        <span class="badge bg-<%= prediction.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
+                                            <%= prediction.predicted_signal %>
+                                        </span><br>
+                                        <strong>Confidence:</strong> <%= prediction.confidence.toFixed(2) %>%<br>
+                                        <strong>Current Price:</strong> $<%= prediction.actual_price.toFixed(2) %><br>
+                                        <strong>Predicted Price:</strong> $<%= prediction.predicted_price.toFixed(2) %><br>
+                                        <strong>Profit Potential:</strong> 
+                                        <span class="<%= prediction.profit_loss >= 0 ? 'text-success' : 'text-danger' %>">
+                                            <%= prediction.profit_loss.toFixed(2) %>%
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Price Chart
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: <%- JSON.stringify(chartData.labels) %>,
-                datasets: [{
-                    label: 'BTC/USDT Price',
-                    data: <%- JSON.stringify(chartData.prices) %>,
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'BTC/USDT Price History'
-                    }
+        // Initialize charts for top coins
+        <% topCoins.forEach(function(coin) { %>
+            new Chart(document.getElementById('chart_<%= coin.symbol.replace('/', '_') %>').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: <%- JSON.stringify(coin.chartData.labels) %>,
+                    datasets: [{
+                        label: '<%= coin.symbol %> Price',
+                        data: <%- JSON.stringify(coin.chartData.prices) %>,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: false
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '<%= coin.symbol %> Price History'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
                     }
                 }
-            }
-        });
+            });
+        <% }); %>
+
+        // Function to run new predictions
+        function runPredictions() {
+            fetch('/api/run-predictions', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error running predictions: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error running predictions');
+            });
+        }
     </script>
 </body>
 </html> 

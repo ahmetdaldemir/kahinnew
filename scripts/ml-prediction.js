@@ -266,33 +266,62 @@ function calculateVolume24h(data) {
 async function main() {
     try {
         console.log('Starting ML prediction process...');
-        const symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT'];
+        
+        // Get all available symbols from coin_pairs table
+        const symbols = await new Promise((resolve, reject) => {
+            db.all('SELECT symbol FROM coin_pairs', (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows.map(row => row.symbol));
+            });
+        });
+
+        console.log(`Found ${symbols.length} symbols to analyze`);
         const results = [];
 
+        // Process each symbol
         for (const symbol of symbols) {
-            const result = await generatePredictions(symbol);
-            if (result && result.confidence >= 10 && result.profit >= 5) {
-                results.push(result);
+            try {
+                console.log(`\nAnalyzing ${symbol}...`);
+                const result = await generatePredictions(symbol);
+                if (result && result.confidence >= 10 && result.profit >= 5) {
+                    results.push(result);
+                }
+            } catch (error) {
+                console.error(`Error analyzing ${symbol}:`, error);
+                continue;
             }
         }
 
-        console.log('\nFinal Predictions:');
-        console.table(results);
+        // Sort results by confidence and profit
+        results.sort((a, b) => {
+            const scoreA = (a.confidence * 0.7) + (a.profit * 0.3);
+            const scoreB = (b.confidence * 0.7) + (b.profit * 0.3);
+            return scoreB - scoreA;
+        });
+
+        // Take top 50 results
+        const topResults = results.slice(0, 50);
+
+        console.log('\nTop 50 Predictions:');
+        console.table(topResults);
 
         // Save predictions to database
         const stmt = db.prepare(`
             INSERT INTO prediction_performance (
-                symbol, prediction_date, predicted_signal, confidence, is_correct
-            ) VALUES (?, ?, ?, ?, ?)
+                symbol, prediction_date, predicted_signal, confidence, 
+                actual_price, predicted_price, profit_loss
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
 
-        for (const result of results) {
+        for (const result of topResults) {
             stmt.run(
                 result.symbol,
                 new Date().toISOString(),
                 result.signal,
                 result.confidence,
-                null // is_correct will be updated later
+                result.currentPrice,
+                result.predictedPrice,
+                result.profit
             );
         }
 

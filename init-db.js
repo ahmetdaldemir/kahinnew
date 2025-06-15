@@ -10,18 +10,17 @@ if (!fs.existsSync(dbDir)) {
 }
 
 // Create database connection
-const db = new sqlite3.Database(path.join(dbDir, 'crypto_analyzer.db'));
+const dbPath = path.join(dbDir, 'crypto_analyzer.db');
+console.log('Database path:', dbPath);
+const db = new sqlite3.Database(dbPath);
 
 // Initialize database tables
 db.serialize(() => {
     // Watch list table
     db.run(`CREATE TABLE IF NOT EXISTS watch_list (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        symbol TEXT NOT NULL,
-        current_price REAL,
-        signal TEXT,
-        confidence REAL,
-        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+        symbol TEXT NOT NULL UNIQUE,
+        added_date DATETIME NOT NULL
     )`);
 
     // Historical data table
@@ -29,18 +28,8 @@ db.serialize(() => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         symbol TEXT NOT NULL,
         timestamp DATETIME NOT NULL,
-        open REAL NOT NULL,
-        high REAL NOT NULL,
-        low REAL NOT NULL,
-        close REAL NOT NULL,
+        price REAL NOT NULL,
         volume REAL NOT NULL,
-        rsi REAL,
-        macd REAL,
-        macd_signal REAL,
-        macd_histogram REAL,
-        bb_upper REAL,
-        bb_middle REAL,
-        bb_lower REAL,
         UNIQUE(symbol, timestamp)
     )`);
 
@@ -51,11 +40,17 @@ db.serialize(() => {
         prediction_date DATETIME NOT NULL,
         predicted_signal TEXT NOT NULL,
         confidence REAL NOT NULL,
-        is_correct BOOLEAN,
-        actual_price REAL,
-        predicted_price REAL,
-        profit_loss REAL,
+        actual_price REAL NOT NULL,
+        predicted_price REAL NOT NULL,
+        profit_loss REAL NOT NULL,
         UNIQUE(symbol, prediction_date)
+    )`);
+
+    // Coin pairs table
+    db.run(`CREATE TABLE IF NOT EXISTS coin_pairs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT NOT NULL UNIQUE,
+        added_date DATETIME NOT NULL
     )`);
 
     // Create indexes
@@ -67,10 +62,6 @@ db.serialize(() => {
 });
 
 // Close database connection
-db.close((err) => {
-    if (err) {
-        console.error('Error closing database:', err);
-    } else {
-        console.log('Database connection closed');
-    }
+db.close(() => {
+    console.log('Database connection closed');
 }); 

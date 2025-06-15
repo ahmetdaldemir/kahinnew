@@ -54,10 +54,8 @@ async function fetchHistoricalData(symbol) {
         // Prepare data for insertion
         const stmt = db.prepare(`
             INSERT OR IGNORE INTO historical_data (
-                symbol, timestamp, open, high, low, close, volume,
-                rsi, macd, macd_signal, macd_histogram,
-                bb_upper, bb_middle, bb_lower
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                symbol, timestamp, price, volume
+            ) VALUES (?, ?, ?, ?)
         `);
 
         while (since < endTimestamp) {
@@ -70,27 +68,11 @@ async function fetchHistoricalData(symbol) {
 
             for (const candle of ohlcv) {
                 const [timestamp, open, high, low, close, volume] = candle;
-                
-                // Calculate technical indicators
-                const rsi = calculateRSI(ohlcv, 14);
-                const { macd, signal, histogram } = calculateMACD(ohlcv);
-                const { upper, middle, lower } = calculateBollingerBands(ohlcv, 20, 2);
-
                 stmt.run(
                     symbol,
                     new Date(timestamp).toISOString(),
-                    open,
-                    high,
-                    low,
                     close,
-                    volume,
-                    rsi,
-                    macd,
-                    signal,
-                    histogram,
-                    upper,
-                    middle,
-                    lower
+                    volume
                 );
             }
 
@@ -136,9 +118,23 @@ function calculateBollingerBands(data, period, stdDev) {
 // Main function
 async function main() {
     try {
-        // List of symbols to fetch
-        const symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT'];
-        
+        // Fetch all available symbols from Binance
+        const markets = await binance.loadMarkets();
+        const symbols = Object.keys(markets).filter(symbol => symbol.endsWith('/USDT'));
+        console.log(`Found ${symbols.length} USDT pairs`);
+
+        // Store coin pairs in the database
+        const stmt = db.prepare(`
+            INSERT OR IGNORE INTO coin_pairs (symbol, added_date)
+            VALUES (?, ?)
+        `);
+        for (const symbol of symbols) {
+            stmt.run(symbol, new Date().toISOString());
+        }
+        stmt.finalize();
+        console.log('Coin pairs stored in database');
+
+        // Fetch historical data for each symbol
         for (const symbol of symbols) {
             await fetchHistoricalData(symbol);
         }
