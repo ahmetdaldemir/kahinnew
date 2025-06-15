@@ -1,212 +1,94 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kripto Trading Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.css" rel="stylesheet">
+    <title>Crypto Analyzer Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .coin-card {
+        .prediction-card {
             transition: transform 0.2s;
-            cursor: pointer;
         }
-        .coin-card:hover {
+        .prediction-card:hover {
             transform: translateY(-5px);
         }
-        .signal-badge {
-            font-size: 0.8rem;
-            padding: 0.3rem 0.6rem;
+        .buy {
+            border-left: 4px solid #28a745;
         }
-        .chart-container {
-            height: 400px;
-            margin-top: 20px;
-        }
-        .confidence-bar {
-            height: 5px;
-            border-radius: 2px;
-        }
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
+        .sell {
+            border-left: 4px solid #dc3545;
         }
     </style>
 </head>
 <body class="bg-light">
-    <div class="container-fluid py-4">
-        <div class="row mb-4">
-            <div class="col">
-                <h1 class="h3">Kripto Trading Dashboard</h1>
-                <p class="text-muted">Son güncelleme: <%= lastUpdate %></p>
-            </div>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">Crypto Analyzer</span>
         </div>
+    </nav>
 
-        <!-- Top 10 Coins Section -->
-        <div class="row mb-4">
-            <div class="col">
-                <h2 class="h4 mb-3">En Yüksek Güven Oranlı 10 Coin</h2>
-                <div class="row" id="topCoins">
-                    <% 
-                    const topCoins = [...buySignals, ...sellSignals]
-                        .sort((a, b) => b.confidence - a.confidence)
-                        .slice(0, 10);
-                    %>
-                    <% topCoins.forEach(coin => { %>
-                        <div class="col-md-4 col-lg-3 mb-3">
-                            <div class="card coin-card" data-symbol="<%= coin.symbol %>">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <h5 class="card-title mb-0"><%= coin.symbol %></h5>
-                                        <span class="badge <%= coin.signal === 'BUY' ? 'bg-success' : 'bg-danger' %> signal-badge">
-                                            <%= coin.signal %>
-                                        </span>
-                                    </div>
-                                    <p class="card-text mb-2">
-                                        Fiyat: $<%= coin.price.toFixed(2) %>
-                                    </p>
-                                    <div class="mb-2">
-                                        <small class="text-muted">Güven Oranı:</small>
-                                        <div class="progress">
-                                            <div class="progress-bar <%= coin.signal === 'BUY' ? 'bg-success' : 'bg-danger' %>" 
-                                                 role="progressbar" 
-                                                 style="width: <%= coin.confidence %>%">
-                                                <%= coin.confidence %>%
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="small text-muted">
-                                        <div>RSI: <%= coin.indicators.rsi.toFixed(2) %></div>
-                                        <div>MACD: <%= coin.indicators.macd.toFixed(2) %></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    <% }); %>
-                </div>
-            </div>
-        </div>
-
-        <!-- Chart Section -->
+    <div class="container mt-4">
         <div class="row">
-            <div class="col">
+            <div class="col-md-12 mb-4">
                 <div class="card">
                     <div class="card-body">
-                        <h3 class="h4 mb-3" id="chartTitle">Coin Detayları</h3>
-                        <div id="chartContainer" class="chart-container"></div>
+                        <h5 class="card-title">Price Chart</h5>
+                        <canvas id="priceChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
-        <div class="spinner-border text-light loading-spinner" role="status">
-            <span class="visually-hidden">Loading...</span>
+        <div class="row">
+            <% predictions.forEach(function(prediction) { %>
+                <div class="col-md-4 mb-4">
+                    <div class="card prediction-card <%= prediction.signal.toLowerCase() %>">
+                        <div class="card-body">
+                            <h5 class="card-title"><%= prediction.symbol %></h5>
+                            <p class="card-text">
+                                <strong>Signal:</strong> <span class="badge bg-<%= prediction.signal === 'BUY' ? 'success' : 'danger' %>"><%= prediction.signal %></span><br>
+                                <strong>Confidence:</strong> <%= prediction.confidence %>%<br>
+                                <strong>Current Price:</strong> $<%= prediction.currentPrice %><br>
+                                <strong>24h Change:</strong> <span class="<%= prediction.priceChange24h >= 0 ? 'text-success' : 'text-danger' %>"><%= prediction.priceChange24h %>%</span><br>
+                                <strong>24h Volume:</strong> $<%= prediction.volume24h %>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            <% }); %>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <script>
-        let chart = null;
-        let candlestickSeries = null;
-
-        // Chart initialization
-        function initChart() {
-            const chartContainer = document.getElementById('chartContainer');
-            chart = LightweightCharts.createChart(chartContainer, {
-                width: chartContainer.clientWidth,
-                height: chartContainer.clientHeight,
-                layout: {
-                    background: { color: '#ffffff' },
-                    textColor: '#333',
+        // Price Chart
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: <%- JSON.stringify(chartData.labels) %>,
+                datasets: [{
+                    label: 'BTC/USDT Price',
+                    data: <%- JSON.stringify(chartData.prices) %>,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'BTC/USDT Price History'
+                    }
                 },
-                grid: {
-                    vertLines: { color: '#f0f0f0' },
-                    horzLines: { color: '#f0f0f0' },
-                },
-                timeScale: {
-                    timeVisible: true,
-                    secondsVisible: false,
-                },
-            });
-
-            candlestickSeries = chart.addCandlestickSeries({
-                upColor: '#26a69a',
-                downColor: '#ef5350',
-                borderVisible: false,
-                wickUpColor: '#26a69a',
-                wickDownColor: '#ef5350',
-            });
-
-            // Responsive chart
-            window.addEventListener('resize', () => {
-                chart.applyOptions({
-                    width: chartContainer.clientWidth,
-                });
-            });
-        }
-
-        // Load historical data
-        async function loadHistoricalData(symbol) {
-            try {
-                showLoading();
-                const response = await fetch(`/api/historical-data/${symbol}`);
-                const data = await response.json();
-                
-                if (!chart) {
-                    initChart();
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
                 }
-
-                const candleData = data.map(d => ({
-                    time: new Date(d.timestamp).getTime() / 1000,
-                    open: d.open,
-                    high: d.high,
-                    low: d.low,
-                    close: d.close
-                }));
-
-                candlestickSeries.setData(candleData);
-                document.getElementById('chartTitle').textContent = `${symbol} Grafik`;
-                hideLoading();
-            } catch (error) {
-                console.error('Error loading historical data:', error);
-                hideLoading();
             }
-        }
-
-        // Event listeners
-        document.querySelectorAll('.coin-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const symbol = card.dataset.symbol;
-                loadHistoricalData(symbol);
-            });
         });
-
-        // Loading functions
-        function showLoading() {
-            document.getElementById('loadingOverlay').style.display = 'flex';
-        }
-
-        function hideLoading() {
-            document.getElementById('loadingOverlay').style.display = 'none';
-        }
-
-        // Initialize chart
-        initChart();
     </script>
 </body>
 </html> 

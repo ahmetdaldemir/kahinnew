@@ -33,6 +33,12 @@ jobs:
     - name: Fetch Historical Data
       run: npm run fetch-historical
     
+    - name: Fetch Real-time Data
+      run: npm run fetch-realtime
+    
+    - name: Run Machine Learning Predictions
+      run: node scripts/ml-prediction.js
+    
     - name: Install PM2
       run: npm install -g pm2
     

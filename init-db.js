@@ -3,9 +3,10 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 // Create database directory if it doesn't exist
+const fs = require('fs');
 const dbDir = path.join(__dirname, 'data');
-if (!require('fs').existsSync(dbDir)) {
-    require('fs').mkdirSync(dbDir, { recursive: true });
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir);
 }
 
 // Create database connection
@@ -40,7 +41,7 @@ db.serialize(() => {
         bb_upper REAL,
         bb_middle REAL,
         bb_lower REAL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        UNIQUE(symbol, timestamp)
     )`);
 
     // Prediction performance table
@@ -49,10 +50,12 @@ db.serialize(() => {
         symbol TEXT NOT NULL,
         prediction_date DATETIME NOT NULL,
         predicted_signal TEXT NOT NULL,
-        actual_signal TEXT,
-        confidence REAL,
+        confidence REAL NOT NULL,
         is_correct BOOLEAN,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        actual_price REAL,
+        predicted_price REAL,
+        profit_loss REAL,
+        UNIQUE(symbol, prediction_date)
     )`);
 
     // Create indexes
