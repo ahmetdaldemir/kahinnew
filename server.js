@@ -6,6 +6,49 @@ const { spawn, execSync } = require('child_process');
 const app = express();
 const port = process.env.PORT || 3200;
 
+
+(async function autoSetupAndStartServer() {
+    const dbPath = path.join(__dirname, 'data', 'crypto_analyzer.db');
+    const db = new sqlite3.Database(dbPath);
+
+    // 1. Veritabanı oluştur
+    await runScriptAsync('node init-db.js');
+
+    // 2. Veri var mı kontrol et
+    const hasData = await new Promise((resolve, reject) => {
+        db.get('SELECT COUNT(*) as cnt FROM historical_data', (err, row) => {
+            if (!err && row && row.cnt > 0) {
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        });
+    });
+
+    // 3. Veri eksikse çek
+    if (!hasData) {
+        await runScriptAsync('node scripts/fetch-historical-data.js');
+    }
+
+    // 4. ML tahminlerini çalıştır
+    await runScriptAsync('node scripts/ml-prediction.js');
+
+    // 5. Express server'ı başlat
+    startExpressServer();
+})();
+
+// Yardımcı: senkron değil, promisified
+function runScriptAsync(command) {
+    return new Promise((resolve, reject) => {
+        console.log(`Çalıştırılıyor: ${command}`);
+        const process = spawn('bash', ['-c', command], { stdio: 'inherit' });
+        process.on('exit', code => {
+            if (code === 0) resolve();
+            else reject(new Error(`Komut başarısız: ${command}`));
+        });
+    });
+}
+
 // Yardımcı fonksiyon: Scripti senkron çalıştır
 function runScriptSync(command) {
     try {
