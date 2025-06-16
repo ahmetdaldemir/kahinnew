@@ -60,6 +60,10 @@ async function fetchRealtimeData(symbol, timeframe) {
     }
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function main() {
     try {
         console.log('Starting real-time data check...');
@@ -71,6 +75,7 @@ async function main() {
         for (const row of pairs) {
             for (const timeframe of timeframes) {
                 await fetchRealtimeData(row.symbol, timeframe);
+                await sleep(1000);
             }
         }
         console.log('Real-time data check completed');

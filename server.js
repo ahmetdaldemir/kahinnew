@@ -145,7 +145,20 @@ function startExpressServer() {
             });
         } catch (error) {
             console.error('Ana sayfa yüklenirken hata:', error);
-            res.status(500).send('Sunucu hatası: ' + error.message);
+            // Hata durumunda da lastUpdate gönder
+            res.render('index', {
+                uptrendCoins: [],
+                highConfidenceCoins: [],
+                highProfitCoins: [],
+                lastUpdate: new Date().toLocaleString('tr-TR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                })
+            });
         }
     });
 

@@ -58,6 +58,10 @@ async function fetchHistoricalData(symbol) {
     }
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function main() {
     try {
         console.log('Starting historical data check...');
@@ -66,6 +70,7 @@ async function main() {
 
         for (const row of pairs) {
             await fetchHistoricalData(row.symbol);
+            await sleep(1000);
         }
         console.log('Historical data check completed');
         process.exit(0);
