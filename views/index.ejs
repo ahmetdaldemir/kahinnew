@@ -3,159 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Analyzer Dashboard</title>
+    <title>Kripto Analiz Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { background: #f8f9fa; }
-        .section-title { margin-top: 2rem; margin-bottom: 1rem; }
-        .coin-card {
-            border-radius: 1rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            transition: box-shadow 0.2s;
-            min-height: 200px;
+        .card {
+            transition: transform 0.2s;
+            margin-bottom: 20px;
         }
-        .coin-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
-        .trend-up { color: #28a745; }
-        .trend-down { color: #dc3545; }
-        .badge-signal-buy { background: #28a745; }
-        .badge-signal-sell { background: #dc3545; }
-        .confidence-bar {
-            height: 8px;
-            border-radius: 4px;
-            background: #e9ecef;
-            margin-top: 8px;
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        .confidence-bar-inner {
-            height: 100%;
-            border-radius: 4px;
-            background: linear-gradient(90deg, #28a745, #ffc107);
+        .trend-up {
+            color: #28a745;
         }
-        .sparkline {
-            width: 100%;
-            height: 40px;
+        .trend-down {
+            color: #dc3545;
         }
-        .placeholder {
-            color: #aaa;
-            font-style: italic;
-            text-align: center;
-            margin: 2rem 0;
+        .confidence-high {
+            color: #28a745;
+        }
+        .confidence-medium {
+            color: #ffc107;
+        }
+        .confidence-low {
+            color: #dc3545;
+        }
+        .last-update {
+            font-size: 0.8rem;
+            color: #6c757d;
         }
     </style>
 </head>
-<body>
-<nav class="navbar navbar-dark bg-dark mb-4">
-    <div class="container-fluid">
-        <span class="navbar-brand mb-0 h1"><i class="fa-solid fa-chart-line me-2"></i>Crypto Analyzer</span>
-        <button class="btn btn-outline-light" onclick="runPredictions()">Run New Analysis</button>
-    </div>
-</nav>
-<div class="container">
-    <!-- Yükseliş Trendindeki 10 Coin -->
-    <h3 class="section-title"><i class="fa-solid fa-arrow-trend-up trend-up"></i> Yükseliş Trendindeki 10 Coin</h3>
-    <div class="row">
-        <% let upList = uptrendCoins && uptrendCoins.length ? uptrendCoins : [
-            {symbol:'BTC/USDT', actual_price:42000, change24h:5.2, confidence:92, predicted_signal:'BUY'},
-            {symbol:'ETH/USDT', actual_price:2100, change24h:3.1, confidence:88, predicted_signal:'BUY'},
-            {symbol:'SOL/USDT', actual_price:120, change24h:2.7, confidence:85, predicted_signal:'BUY'}
-        ]; %>
-        <% upList.forEach(function(coin) { %>
-            <div class="col-md-4 col-lg-3 mb-4">
-                <div class="card coin-card border-success">
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line me-2"></i>
+                Kripto Analiz Dashboard
+            </a>
+            <button class="btn btn-outline-light" onclick="runPredictions()">
+                <i class="fas fa-sync-alt me-2"></i>
+                Tahminleri Güncelle
+            </button>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Son güncelleme: <%= lastUpdate %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Yükseliş Trendindeki Coinler -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-arrow-up me-2"></i>
+                            Yükseliş Trendindeki Coinler
+                        </h5>
+                    </div>
                     <div class="card-body">
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="fa-solid fa-arrow-up trend-up fa-lg me-2"></i>
-                            <h5 class="card-title mb-0"><%= coin.symbol %></h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Sembol</th>
+                                        <th>Güncel Fiyat</th>
+                                        <th>24s Değişim</th>
+                                        <th>Güven Oranı</th>
+                                        <th>Kar Potansiyeli</th>
+                                        <th>Sinyal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% uptrendCoins.forEach(coin => { %>
+                                        <tr>
+                                            <td><strong><%= coin.symbol %></strong></td>
+                                            <td>$<%= parseFloat(coin.current_price).toFixed(2) %></td>
+                                            <td class="trend-up">
+                                                <i class="fas fa-arrow-up me-1"></i>
+                                                <%= coin.change24h.toFixed(2) %>%
+                                            </td>
+                                            <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 40 ? 'confidence-medium' : 'confidence-low' %>">
+                                                <%= coin.confidence.toFixed(2) %>%
+                                            </td>
+                                            <td class="<%= coin.profit_loss >= 0 ? 'trend-up' : 'trend-down' %>">
+                                                <%= coin.profit_loss.toFixed(2) %>%
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
+                                                    <%= coin.predicted_signal %>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
                         </div>
-                        <div><strong>Son Fiyat:</strong> <span class="fw-bold">$<%= coin.actual_price %></span></div>
-                        <div><strong>24s Değişim:</strong> <span class="badge bg-success">
-                            <i class="fa-solid fa-arrow-up"></i> %<%= coin.change24h.toFixed(2) %>
-                        </span></div>
-                        <div class="confidence-bar mt-2">
-                            <div class="confidence-bar-inner" style="width: <%= coin.confidence %>%;"></div>
-                        </div>
-                        <span class="badge badge-signal-<%= coin.predicted_signal === 'BUY' ? 'buy' : 'sell' %>"><%= coin.predicted_signal %></span>
                     </div>
                 </div>
             </div>
-        <% }); %>
-    </div>
-    <!-- Düşüş Trendindeki 10 Coin -->
-    <h3 class="section-title"><i class="fa-solid fa-arrow-trend-down trend-down"></i> Düşüş Trendindeki 10 Coin</h3>
-    <div class="row">
-        <% let downList = downtrendCoins && downtrendCoins.length ? downtrendCoins : [
-            {symbol:'XRP/USDT', actual_price:0.55, change24h:-4.1, confidence:80, predicted_signal:'SELL'},
-            {symbol:'DOGE/USDT', actual_price:0.075, change24h:-2.8, confidence:77, predicted_signal:'SELL'},
-            {symbol:'LTC/USDT', actual_price:85, change24h:-1.9, confidence:75, predicted_signal:'SELL'}
-        ]; %>
-        <% downList.forEach(function(coin) { %>
-            <div class="col-md-4 col-lg-3 mb-4">
-                <div class="card coin-card border-danger">
+        </div>
+
+        <!-- En Yüksek Güven Oranlı Coinler -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            En Yüksek Güven Oranlı Coinler
+                        </h5>
+                    </div>
                     <div class="card-body">
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="fa-solid fa-arrow-down trend-down fa-lg me-2"></i>
-                            <h5 class="card-title mb-0"><%= coin.symbol %></h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Sembol</th>
+                                        <th>Güven Oranı</th>
+                                        <th>Güncel Fiyat</th>
+                                        <th>24s Değişim</th>
+                                        <th>Kar Potansiyeli</th>
+                                        <th>Sinyal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% highConfidenceCoins.forEach(coin => { %>
+                                        <tr>
+                                            <td><strong><%= coin.symbol %></strong></td>
+                                            <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 40 ? 'confidence-medium' : 'confidence-low' %>">
+                                                <%= coin.confidence.toFixed(2) %>%
+                                            </td>
+                                            <td>$<%= parseFloat(coin.current_price).toFixed(2) %></td>
+                                            <td class="<%= coin.change24h >= 0 ? 'trend-up' : 'trend-down' %>">
+                                                <i class="fas fa-arrow-<%= coin.change24h >= 0 ? 'up' : 'down' %> me-1"></i>
+                                                <%= coin.change24h.toFixed(2) %>%
+                                            </td>
+                                            <td class="<%= coin.profit_loss >= 0 ? 'trend-up' : 'trend-down' %>">
+                                                <%= coin.profit_loss.toFixed(2) %>%
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
+                                                    <%= coin.predicted_signal %>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
                         </div>
-                        <div><strong>Son Fiyat:</strong> <span class="fw-bold">$<%= coin.actual_price %></span></div>
-                        <div><strong>24s Değişim:</strong> <span class="badge bg-danger">
-                            <i class="fa-solid fa-arrow-down"></i> %<%= coin.change24h.toFixed(2) %>
-                        </span></div>
-                        <div class="confidence-bar mt-2">
-                            <div class="confidence-bar-inner" style="width: <%= coin.confidence %>%;"></div>
-                        </div>
-                        <span class="badge badge-signal-<%= coin.predicted_signal === 'BUY' ? 'buy' : 'sell' %>"><%= coin.predicted_signal %></span>
                     </div>
                 </div>
             </div>
-        <% }); %>
-    </div>
-    <!-- En Yüksek Güven Oranına Sahip 10 Coin -->
-    <h3 class="section-title"><i class="fa-solid fa-shield-halved text-primary"></i> En Yüksek Güven Oranına Sahip 10 Coin</h3>
-    <div class="row">
-        <% let confList = highConfidenceCoins && highConfidenceCoins.length ? highConfidenceCoins : [
-            {symbol:'BNB/USDT', actual_price:320, change24h:1.2, confidence:97, predicted_signal:'BUY'},
-            {symbol:'ADA/USDT', actual_price:0.38, change24h:-0.5, confidence:95, predicted_signal:'SELL'},
-            {symbol:'AVAX/USDT', actual_price:14.5, change24h:0.8, confidence:93, predicted_signal:'BUY'}
-        ]; %>
-        <% confList.forEach(function(coin) { %>
-            <div class="col-md-4 col-lg-3 mb-4">
-                <div class="card coin-card border-primary">
+        </div>
+
+        <!-- En Yüksek Kar Potansiyelli Coinler -->
+        <div class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            En Yüksek Kar Potansiyelli Coinler
+                        </h5>
+                    </div>
                     <div class="card-body">
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="fa-solid fa-shield-halved text-primary fa-lg me-2"></i>
-                            <h5 class="card-title mb-0"><%= coin.symbol %></h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Sembol</th>
+                                        <th>Kar Potansiyeli</th>
+                                        <th>Güven Oranı</th>
+                                        <th>Güncel Fiyat</th>
+                                        <th>24s Değişim</th>
+                                        <th>Sinyal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% highProfitCoins.forEach(coin => { %>
+                                        <tr>
+                                            <td><strong><%= coin.symbol %></strong></td>
+                                            <td class="trend-up">
+                                                <%= coin.profit_loss.toFixed(2) %>%
+                                            </td>
+                                            <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 40 ? 'confidence-medium' : 'confidence-low' %>">
+                                                <%= coin.confidence.toFixed(2) %>%
+                                            </td>
+                                            <td>$<%= parseFloat(coin.current_price).toFixed(2) %></td>
+                                            <td class="<%= coin.change24h >= 0 ? 'trend-up' : 'trend-down' %>">
+                                                <i class="fas fa-arrow-<%= coin.change24h >= 0 ? 'up' : 'down' %> me-1"></i>
+                                                <%= coin.change24h.toFixed(2) %>%
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
+                                                    <%= coin.predicted_signal %>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
                         </div>
-                        <div><strong>Son Fiyat:</strong> <span class="fw-bold">$<%= coin.actual_price %></span></div>
-                        <div><strong>24s Değişim:</strong> <span class="badge <%= coin.change24h > 0 ? 'bg-success' : 'bg-danger' %>">
-                            <i class="fa-solid <%= coin.change24h > 0 ? 'fa-arrow-up' : 'fa-arrow-down' %>"></i> %<%= coin.change24h.toFixed(2) %>
-                        </span></div>
-                        <div class="confidence-bar mt-2">
-                            <div class="confidence-bar-inner" style="width: <%= coin.confidence %>%;"></div>
-                        </div>
-                        <span class="badge badge-signal-<%= coin.predicted_signal === 'BUY' ? 'buy' : 'sell' %>"><%= coin.predicted_signal %></span>
                     </div>
                 </div>
             </div>
-        <% }); %>
+        </div>
     </div>
-    <% if (!(uptrendCoins && uptrendCoins.length) && !(downtrendCoins && downtrendCoins.length) && !(highConfidenceCoins && highConfidenceCoins.length)) { %>
-        <div class="alert alert-warning mt-4">Gerçek veri bulunamadı, örnek veriler gösteriliyor. Lütfen veri çekme ve tahmin scriptlerini çalıştırın.</div>
-    <% } %>
-</div>
-<script>
-function runPredictions() {
-    fetch('/api/run-predictions', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) window.location.reload();
-            else alert('Error running predictions: ' + data.error);
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error running predictions');
-        });
-}
-</script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function runPredictions() {
+            fetch('/api/run-predictions', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Tahminler güncelleniyor...');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 5000);
+                } else {
+                    alert('Tahmin güncelleme hatası: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Bir hata oluştu: ' + error);
+            });
+        }
+    </script>
 </body>
 </html> 

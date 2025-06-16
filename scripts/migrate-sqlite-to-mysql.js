@@ -56,6 +56,14 @@ async function migrate() {
     try {
         console.log('\n=== Veri Taşıma İşlemi Başlatılıyor ===\n');
         
+             // coin_pairs
+             await migrateTable(
+                'coin_pairs',
+                ['symbol', 'added_date'],
+                `INSERT IGNORE INTO coin_pairs (symbol, added_date) VALUES (?, ?)`
+            );
+    
+
         // historical_data
         await migrateTable(
             'historical_data',

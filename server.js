@@ -66,10 +66,13 @@ function startExpressServer() {
     // Main dashboard route
     app.get('/', async (req, res) => {
         try {
-            // Her coin için son 24 saatlik değişimi hesapla
+            // Son 24 saatteki değişimleri hesapla
             async function get24hChange(symbol) {
                 const rows = await query(
-                    `SELECT price FROM historical_data WHERE symbol = ? ORDER BY timestamp DESC LIMIT 24`,
+                    `SELECT price FROM historical_data 
+                     WHERE symbol = ? 
+                     AND timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                     ORDER BY timestamp DESC`,
                     [symbol]
                 );
                 if (rows.length < 2) return 0;
@@ -78,41 +81,70 @@ function startExpressServer() {
                 return ((latest - oldest) / oldest) * 100;
             }
 
-            // prediction_performance tablosundan son tahminleri çek
+            // En son tahminleri al
             const predictions = await query(
-                `SELECT symbol, confidence, predicted_signal, profit_loss, actual_price FROM prediction_performance
-                 WHERE prediction_date = (SELECT MAX(prediction_date) FROM prediction_performance)
-                 ORDER BY symbol`
+                `SELECT p.*, 
+                        h.price as current_price,
+                        h.volume as current_volume
+                 FROM prediction_performance p
+                 LEFT JOIN (
+                     SELECT symbol, price, volume
+                     FROM historical_data
+                     WHERE (symbol, timestamp) IN (
+                         SELECT symbol, MAX(timestamp)
+                         FROM historical_data
+                         GROUP BY symbol
+                     )
+                 ) h ON p.symbol = h.symbol
+                 WHERE p.prediction_date = (
+                     SELECT MAX(prediction_date) 
+                     FROM prediction_performance
+                 )
+                 ORDER BY p.confidence DESC`
             );
 
-            // Her coin için 24s değişimi ekle
+            // Her coin için 24s değişimi ve trend skoru hesapla
             for (const pred of predictions) {
                 pred.change24h = await get24hChange(pred.symbol);
+                // Trend skoru: %70 güven oranı + %30 fiyat değişimi
+                pred.trendScore = (pred.confidence * 0.7) + (pred.change24h * 0.3);
             }
 
-            // Yükseliş trendindeki 10 coin (24s değişimi en yüksek olanlar)
+            // Yükseliş trendindeki coinleri filtrele ve sırala
             const uptrendCoins = predictions
-                .filter(p => p.change24h > 0)
-                .sort((a, b) => b.change24h - a.change24h)
+                .filter(p => p.change24h > 0 && p.confidence >= 10) // En az %10 güven oranı
+                .sort((a, b) => b.trendScore - a.trendScore)
                 .slice(0, 10);
 
-            // Düşüş trendindeki 10 coin (24s değişimi en düşük olanlar)
-            const downtrendCoins = predictions
-                .filter(p => p.change24h < 0)
-                .sort((a, b) => a.change24h - b.change24h)
-                .slice(0, 10);
-
-            // En yüksek güven oranına sahip 10 coin
+            // En yüksek güven oranına sahip coinler
             const highConfidenceCoins = predictions
                 .sort((a, b) => b.confidence - a.confidence)
                 .slice(0, 10);
 
+            // En yüksek kar potansiyeli olan coinler
+            const highProfitCoins = predictions
+                .filter(p => p.profit_loss >= 5) // En az %5 kar potansiyeli
+                .sort((a, b) => b.profit_loss - a.profit_loss)
+                .slice(0, 10);
+
+            // Son güncelleme zamanını al
+            const lastUpdate = new Date().toLocaleString('tr-TR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
             res.render('index', {
                 uptrendCoins,
-                downtrendCoins,
-                highConfidenceCoins
+                highConfidenceCoins,
+                highProfitCoins,
+                lastUpdate
             });
         } catch (error) {
+            console.error('Ana sayfa yüklenirken hata:', error);
             res.status(500).send('Sunucu hatası: ' + error.message);
         }
     });
