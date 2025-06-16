@@ -52,8 +52,8 @@ async function initDatabase() {
             CREATE TABLE IF NOT EXISTS watch_list (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 symbol VARCHAR(20) NOT NULL UNIQUE,
-                added_date DATETIME NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                confidence DECIMAL(5,2) NOT NULL,
+                last_update DATETIME NOT NULL
             )
         `);
         console.log('watch_list tablosu oluşturuldu');

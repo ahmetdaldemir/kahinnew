@@ -32,3 +32,6 @@ model/
 
 crypto-data.db
 data/
+
+.env
+db.js

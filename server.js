@@ -82,6 +82,7 @@ function startExpressServer() {
             const highProfitCoins = await fetchHighProfitCoins();
             const topProfitCoins = await fetchTopProfitCoins();
             const topConfidenceCoins = await fetchTopConfidenceCoins();
+            const watchList = await query('SELECT * FROM watch_list ORDER BY confidence DESC');
 
             const lastUpdate = new Date().toLocaleString('tr-TR', {
                 year: 'numeric',
@@ -100,6 +101,7 @@ function startExpressServer() {
                 highProfitCoins,
                 topProfitCoins,
                 topConfidenceCoins,
+                watchList,
                 lastUpdate
             });
         } catch (error) {
@@ -112,6 +114,7 @@ function startExpressServer() {
                 highProfitCoins: [],
                 topProfitCoins: [],
                 topConfidenceCoins: [],
+                watchList: [],
                 lastUpdate: new Date().toLocaleString('tr-TR')
             });
         }

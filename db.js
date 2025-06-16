@@ -5,7 +5,7 @@ const pool = mysql.createPool({
     host: '185.209.228.189',
     user: 'root',
     password: 'StrongPassword123!',
-    database: 'kahin',
+    database: 'kahin_dev',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0

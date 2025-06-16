@@ -306,8 +306,7 @@ async function trainModel(features, labels) {
 
     // Log weights and biases during training
     const weights = model.getWeights();
-    console.log('Ağırlıklar:', weights[0]);
-    console.log('Bias:', weights[1]);
+ 
 
     return model;
 }
@@ -342,8 +341,6 @@ async function generatePredictions(symbol) {
             lastTimestamp: data[data.length - 1].timestamp
         };
 
-        console.log('DB kayıt:', result);
-        console.log(`Prediction for ${symbol}:`, result);
         return result;
     } catch (error) {
         console.error(`Error generating predictions for ${symbol}:`, error);
@@ -378,16 +375,15 @@ async function main() {
         // Get all available symbols from coin_pairs table
         const pairs = await query('SELECT symbol FROM coin_pairs');
         console.log(`Found ${pairs.length} symbols to analyze`);
-        const results = [];
+        const skippedCoins = [];
+        const watchedCoins = [];
 
         // Process each symbol
         for (const row of pairs) {
             try {
                 console.log(`\nAnalyzing ${row.symbol}...`);
                 const result = await generatePredictions(row.symbol);
-                console.log('resultPre:', result);
                 if (result) {
-                    // Her coin için sonucu hemen kaydet
                     // NaN kontrolü
                     if (
                         isNaN(Number(result.confidence)) ||
@@ -395,12 +391,16 @@ async function main() {
                         isNaN(Number(result.currentPrice)) ||
                         isNaN(Number(result.predictedPrice))
                     ) {
-                        console.error('NaN değer tespit edildi, kayıt yapılmıyor:', result);
+                        console.warn('SKIP: NaN prediction for', result.symbol);
+                        skippedCoins.push(result.symbol);
                         continue;
+                    }
+                    // 50% üzeri güvene sahip coinleri takip listesine ekle
+                    if (Number(result.confidence) >= 50) {
+                        watchedCoins.push(result.symbol);
                     }
                     try {
                         const predictionDate = moment(result.lastTimestamp).format('YYYY-MM-DD HH:mm:ss');
-                        console.log('Kayıt döngüsüne girildi:', result.symbol, predictionDate);
                         const sql = `INSERT INTO prediction_performance (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss)
                              VALUES (?, ?, ?, ?, ?, ?, ?)
                              ON DUPLICATE KEY UPDATE predicted_signal=VALUES(predicted_signal), confidence=VALUES(confidence), actual_price=VALUES(actual_price), predicted_price=VALUES(predicted_price), profit_loss=VALUES(profit_loss)`;
@@ -413,11 +413,9 @@ async function main() {
                             result.predictedPrice,
                             result.profit
                         ];
-                        console.log('SQL:', sql);
-                        console.log('Params:', params);
-                        const insertResult = await query(sql, params);
-                        console.log('Insert result:', insertResult);
-                    } catch (e) {
+               
+                        await query(sql, params);
+                     } catch (e) {
                         console.error(`DB kayıt hatası (${result.symbol}):`, e.message, 'Params:', params);
                     }
                 }
@@ -426,78 +424,28 @@ async function main() {
                 continue;
             }
         }
+        console.log('NaN nedeniyle atlanan coinler:', skippedCoins);
+        console.log('Takip listesine eklenen (50%+ güven) coinler:', watchedCoins);
 
-        console.log('resultsNew:', results);
-
-        // Sort results by confidence and profit
-        results.sort((a, b) => {
-            const scoreA = (a.confidence * 0.7) + (a.profit * 0.3);
-            const scoreB = (b.confidence * 0.7) + (b.profit * 0.3);
-            return scoreB - scoreA;
-        });
-
-        // Take top 50 results
-        const topResults = results.slice(0, 50);
-
-        // Log results and topResults
-        console.log('results length:', results.length);
-        console.log('topResults length:', topResults.length);
-        console.log('results:', results);
-        console.log('topResults:', topResults);
-
-        // Kayıt döngüsüne girmeden önce topResults içeriğini göster
-        if (topResults.length === 0) {
-            console.warn('UYARI: Kayıt döngüsüne girilmiyor, topResults boş!');
-        }
-
-        console.log('\nTop 50 Predictions:');
-        console.table(topResults);
-
-        // Save predictions to database
-        let savedCount = 0;
-        for (const result of topResults) {
-            // NaN kontrolü
-            if (
-                isNaN(Number(result.confidence)) ||
-                isNaN(Number(result.profit)) ||
-                isNaN(Number(result.currentPrice)) ||
-                isNaN(Number(result.predictedPrice))
-            ) {
-                console.error('NaN değer tespit edildi, kayıt yapılmıyor:', result);
-                continue;
-            }
+        // Takip listesine eklenen (50%+ güven) coinler veritabanına kaydedilsin
+        for (const symbol of watchedCoins) {
             try {
-                const predictionDate = moment(result.lastTimestamp).format('YYYY-MM-DD HH:mm:ss');
-                console.log('Kayıt döngüsüne girildi:', result.symbol, predictionDate);
-                const sql = `INSERT INTO prediction_performance (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE predicted_signal=VALUES(predicted_signal), confidence=VALUES(confidence), actual_price=VALUES(actual_price), predicted_price=VALUES(predicted_price), profit_loss=VALUES(profit_loss)`;
-                const params = [
-                    result.symbol,
-                    predictionDate,
-                    result.signal,
-                    result.confidence,
-                    result.currentPrice,
-                    result.predictedPrice,
-                    result.profit
-                ];
-                console.log('SQL:', sql);
-                console.log('Params:', params);
-                const insertResult = await query(sql, params);
-                console.log('Insert result:', insertResult);
-                if (insertResult.affectedRows > 0) {
-                    savedCount++;
-                }
+                // Son confidence değerini prediction_performance tablosundan al
+                const confRow = await query('SELECT confidence FROM prediction_performance WHERE symbol = ? ORDER BY prediction_date DESC LIMIT 1', [symbol]);
+                const confidence = confRow.length > 0 ? confRow[0].confidence : 0;
+                await query(
+                    `INSERT INTO watch_list (symbol, confidence, last_update)
+                     VALUES (?, ?, NOW())
+                     ON DUPLICATE KEY UPDATE confidence=VALUES(confidence), last_update=NOW()`,
+                    [symbol, confidence]
+                );
             } catch (e) {
-                console.error(`DB kayıt hatası (${result.symbol}):`, e.message, 'Params:', params);
+                console.error('Takip listesi güncellenirken hata:', symbol, e.message);
             }
         }
-
-        console.log(`Predictions saved to database: ${savedCount} records`);
-        // process.exit(0);
+        console.log('Takip listesi (watch_list) güncellendi.');
     } catch (error) {
         console.error('Error in main process:', error);
-        // process.exit(1);
     }
 }
 
