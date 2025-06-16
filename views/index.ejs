@@ -346,7 +346,6 @@
     
 
         socket.on('binanceUptrend', function(data) {
-            console.log('binanceUptrend:', data);
             const tbody = document.querySelector('#uptrendCoinsBody');
             tbody.innerHTML = '';
             data.forEach(function(coin) {
