@@ -136,6 +136,36 @@ function startExpressServer() {
         });
     });
 
+    // API: İzleme listesi (watch_list)
+    app.get('/api/watch-list', async (req, res) => {
+        try {
+            const watchList = await query('SELECT * FROM watch_list ORDER BY confidence DESC');
+            res.json({ success: true, data: watchList });
+        } catch (error) {
+            res.json({ success: false, error: error.message });
+        }
+    });
+
+    // API: %5+ Kar Potansiyelli İlk 10 Coin
+    app.get('/api/top-profit-coins', async (req, res) => {
+        try {
+            const coins = await fetchTopProfitCoins();
+            res.json({ success: true, data: coins });
+        } catch (error) {
+            res.json({ success: false, error: error.message });
+        }
+    });
+
+    // API: %50+ Güven Oranlı İlk 10 Coin
+    app.get('/api/top-confidence-coins', async (req, res) => {
+        try {
+            const coins = await fetchTopConfidenceCoins();
+            res.json({ success: true, data: coins });
+        } catch (error) {
+            res.json({ success: false, error: error.message });
+        }
+    });
+
     app.listen(port, () => {
         console.log(`✅ Express server started at http://localhost:${port}`);
     });

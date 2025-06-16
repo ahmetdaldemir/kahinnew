@@ -10,7 +10,7 @@ async function fetchUptrendCoins() {
             FROM prediction_performance
             WHERE profit_loss > 0
             ORDER BY profit_loss DESC
-            LIMIT 10
+            LIMIT 5
         `);
         console.log('Uptrend coins found:', rows.length);
         return rows;
