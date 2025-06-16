@@ -1,24 +1,7 @@
 require('dotenv').config();
 const { query } = require('../db');
 
-// Fetch top 10 coins in uptrend
-async function fetchUptrendCoins() {
-    try {
-        console.log('Fetching uptrend coins...');
-        const rows = await query(`
-            SELECT symbol, profit_loss, confidence, predicted_signal
-            FROM prediction_performance
-            WHERE profit_loss > 0
-            ORDER BY profit_loss DESC
-            LIMIT 5
-        `);
-        console.log('Uptrend coins found:', rows.length);
-        return rows;
-    } catch (error) {
-        console.error('Error fetching uptrend coins:', error);
-        return [];
-    }
-}
+
 
 // Fetch top 10 coins in downtrend
 async function fetchDowntrendCoins() {
@@ -103,14 +86,11 @@ async function main() {
         console.log('Generating dashboard...');
 
         // Fetch data
-        const uptrendCoins = await fetchUptrendCoins();
         const downtrendCoins = await fetchDowntrendCoins();
         const highConfidenceCoins = await fetchHighConfidenceCoins();
         const highProfitCoins = await fetchHighProfitCoins();
 
-        // Display uptrend coins
-        console.log('\nTop 10 Coins in Uptrend:');
-        console.table(uptrendCoins);
+     
 
         // Display downtrend coins
         console.log('\nTop 10 Coins in Downtrend:');
@@ -133,7 +113,6 @@ async function main() {
 main();
 
 module.exports = {
-    fetchUptrendCoins,
     fetchDowntrendCoins,
     fetchHighConfidenceCoins,
     fetchHighProfitCoins,

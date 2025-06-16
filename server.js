@@ -2,7 +2,10 @@ const express = require('express');
 const path = require('path');
 const { spawn, execSync, exec } = require('child_process');
 const { query } = require('./db');
-const { fetchUptrendCoins, fetchHighConfidenceCoins, fetchHighProfitCoins, fetchTopProfitCoins, fetchTopConfidenceCoins } = require('./scripts/dashboard');
+const {  fetchHighConfidenceCoins, fetchHighProfitCoins, fetchTopProfitCoins, fetchTopConfidenceCoins } = require('./scripts/dashboard');
+const http = require('http');
+const socketIo = require('socket.io');
+const axios = require('axios');
 
 const app = express();
 const port = process.env.PORT || 3200;
@@ -34,6 +37,36 @@ function startExpressServer() {
     app.set('view engine', 'ejs');
     app.set('views', path.join(__dirname, 'views'));
     app.use(express.static('public'));
+
+    // HTTP ve Socket.io sunucusu başlat
+    const server = http.createServer(app);
+    const io = socketIo(server);
+
+    io.on('connection', (socket) => {
+        console.log('Bir istemci bağlandı (WebSocket)');
+    });
+
+    // Her 15 saniyede bir Binance'tan en çok yükselen 10 coini çekip yayınla
+    setInterval(async () => {
+        try {
+            const response = await axios.get('https://api.binance.com/api/v3/ticker/24hr');
+            const data = response.data;
+            // USDT pariteleri, en çok yükselen 10 coin (24h priceChangePercent)
+            const uptrend = data
+                .filter(t => t.symbol.endsWith('USDT'))
+                .sort((a, b) => parseFloat(b.priceChangePercent) - parseFloat(a.priceChangePercent))
+                .slice(0, 10)
+                .map(t => ({
+                    symbol: t.symbol,
+                    price: t.lastPrice,
+                    change24h: parseFloat(t.priceChangePercent),
+                    volume: t.quoteVolume
+                }));
+            io.emit('binanceUptrend', uptrend);
+        } catch (e) {
+            console.error('Binance uptrend yayınlanırken hata:', e.message);
+        }
+    }, 15000);
 
     app.get('/', async (req, res) => {
         try {
@@ -77,7 +110,6 @@ function startExpressServer() {
                  ORDER BY p.confidence DESC, p.profit_loss DESC`
             );
 
-            const uptrendCoins = await fetchUptrendCoins();
             const highConfidenceCoins = await fetchHighConfidenceCoins();
             const highProfitCoins = await fetchHighProfitCoins();
             const topProfitCoins = await fetchTopProfitCoins();
@@ -96,7 +128,6 @@ function startExpressServer() {
             res.render('index', {
                 predictions1h,
                 predictions4h,
-                uptrendCoins,
                 highConfidenceCoins,
                 highProfitCoins,
                 topProfitCoins,
@@ -109,7 +140,6 @@ function startExpressServer() {
             res.render('index', {
                 predictions1h: [],
                 predictions4h: [],
-                uptrendCoins: [],
                 highConfidenceCoins: [],
                 highProfitCoins: [],
                 topProfitCoins: [],
@@ -166,7 +196,7 @@ function startExpressServer() {
         }
     });
 
-    app.listen(port, () => {
+    server.listen(port, () => {
         console.log(`✅ Express server started at http://localhost:${port}`);
     });
 
