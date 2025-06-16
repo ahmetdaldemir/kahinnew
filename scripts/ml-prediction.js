@@ -119,10 +119,61 @@ function calculateBollingerBands(prices, period = 20, stdDev = 2) {
     };
 }
 
+// Yeni teknik göstergeler ekleyelim
+function calculateIchimokuCloud(high, low, close, conversionPeriod = 9, basePeriod = 26, spanPeriod = 52) {
+    if (high.length < spanPeriod || low.length < spanPeriod) {
+        return {
+            conversion: close[close.length - 1],
+            base: close[close.length - 1],
+            spanA: close[close.length - 1],
+            spanB: close[close.length - 1]
+        };
+    }
+
+    const conversion = (Math.max(...high.slice(-conversionPeriod)) + Math.min(...low.slice(-conversionPeriod))) / 2;
+    const base = (Math.max(...high.slice(-basePeriod)) + Math.min(...low.slice(-basePeriod))) / 2;
+    const spanA = (conversion + base) / 2;
+    const spanB = (Math.max(...high.slice(-spanPeriod)) + Math.min(...low.slice(-spanPeriod))) / 2;
+
+    return {
+        conversion: isNaN(conversion) ? close[close.length - 1] : conversion,
+        base: isNaN(base) ? close[close.length - 1] : base,
+        spanA: isNaN(spanA) ? close[close.length - 1] : spanA,
+        spanB: isNaN(spanB) ? close[close.length - 1] : spanB
+    };
+}
+
+function calculateMFI(high, low, close, volume, period = 14) {
+    if (high.length < period || low.length < period || close.length < period || volume.length < period) {
+        return 50;
+    }
+
+    const typicalPrices = close.map((c, i) => (high[i] + low[i] + c) / 3);
+    const moneyFlow = typicalPrices.map((tp, i) => tp * volume[i]);
+    
+    let positiveFlow = 0;
+    let negativeFlow = 0;
+    
+    for (let i = 1; i < period; i++) {
+        const index = typicalPrices.length - i;
+        if (typicalPrices[index] > typicalPrices[index - 1]) {
+            positiveFlow += moneyFlow[index];
+        } else {
+            negativeFlow += moneyFlow[index];
+        }
+    }
+    
+    const mfi = 100 - (100 / (1 + positiveFlow / negativeFlow));
+    return isNaN(mfi) ? 50 : mfi;
+}
+
 // Fetch data from database
 async function fetchData(symbol) {
     const rows = await query(
-        `SELECT * FROM historical_data WHERE symbol = ? ORDER BY timestamp`,
+        `SELECT * FROM historical_data 
+         WHERE symbol = ? 
+         AND timeframe IN ('1h', '4h', '1d')
+         ORDER BY timestamp`,
         [symbol]
     );
     return rows;
@@ -170,6 +221,10 @@ function prepareData(data) {
         const atr = calculateATR(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
         const obv = calculateOBV(prices.slice(0, index + 1), volumes.slice(0, index + 1));
         
+        // Yeni teknik göstergeler
+        const ichimoku = calculateIchimokuCloud(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
+        const mfi = calculateMFI(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1), volumes.slice(0, index + 1));
+        
         return [
             price,
             volume,
@@ -193,7 +248,12 @@ function prepareData(data) {
             willr,
             psar,
             atr,
-            obv
+            obv,
+            ichimoku.conversion,
+            ichimoku.base,
+            ichimoku.spanA,
+            ichimoku.spanB,
+            mfi
         ];
     });
 
@@ -240,77 +300,59 @@ function normalizeData(data) {
 
 // Train ML model
 async function trainModel(features, labels) {
-    // NaN kontrolü
-    if (features.some(f => f.some(Number.isNaN)) || labels.some(Number.isNaN)) {
-        console.error('Feature veya label içinde NaN tespit edildi!');
-    }
     console.log('Training ML model...');
     
-    // Create a simplified model
     const model = tf.sequential();
     
-    // Input layer
+    // Daha derin bir model oluştur
+    model.add(tf.layers.dense({
+        units: 64,
+        activation: 'relu',
+        inputShape: [features[0].length]
+    }));
+    
+    model.add(tf.layers.dropout(0.2));
+    
+    model.add(tf.layers.dense({
+        units: 32,
+        activation: 'relu'
+    }));
+    
+    model.add(tf.layers.dropout(0.2));
+    
     model.add(tf.layers.dense({
         units: 16,
-        activation: 'relu',
-        inputShape: [features[0].length],
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }) // L2 regularization
+        activation: 'relu'
     }));
     
-    // Hidden layer
-    model.add(tf.layers.dropout(0.2));
-    model.add(tf.layers.dense({
-        units: 8,
-        activation: 'relu',
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }) // L2 regularization
-    }));
-    
-    // Output layer
     model.add(tf.layers.dense({
         units: 1,
         activation: 'sigmoid'
     }));
     
-    // Compile model with a lower learning rate
-    const learningRate = 0.001; // Düşük öğrenme oranı
-    const clipValue = 1.0; // Gradyan kırpma değeri
     model.compile({
-        optimizer: tf.train.adam(learningRate),
+        optimizer: tf.train.adam(0.001),
         loss: 'binaryCrossentropy',
-        metrics: ['accuracy'],
-        clipValue: clipValue
-    });
-
-    // Prepare data
-    const xs = tf.tensor2d(features);
-    const ys = tf.tensor2d(labels, [labels.length, 1]);
-
-    // Early stopping callback
-    const earlyStopping = tf.callbacks.earlyStopping({
-        monitor: 'val_loss',
-        patience: 5,
-       // restoreBestWeights: true
-    });
-
-    // Train model
-    await model.fit(xs, ys, {
-        epochs: 50,
-        batchSize: 32,
-        validationSplit: 0.2,
-        verbose: 1,
-        callbacks: [earlyStopping]
+        metrics: ['accuracy']
     });
     
-    console.log('Model training completed');
-
-    // Save model weights to data folder
-    await model.save('file://./data/model-weights');
-    console.log('Model weights saved to data folder');
-
-    // Log weights and biases during training
-    const weights = model.getWeights();
- 
-
+    // Daha uzun eğitim
+    await model.fit(tf.tensor2d(features), tf.tensor1d(labels), {
+        epochs: 100,
+        batchSize: 32,
+        validationSplit: 0.2,
+        shuffle: true,
+        callbacks: {
+            onEpochEnd: (epoch, logs) => {
+                console.log(`Epoch ${epoch + 1} / 100`);
+                console.log(`  Loss: ${logs.loss.toFixed(4)}`);
+                console.log(`  Accuracy: ${logs.acc.toFixed(4)}`);
+                console.log(`  Validation Loss: ${logs.val_loss.toFixed(4)}`);
+                console.log(`  Validation Accuracy: ${logs.val_acc.toFixed(4)}`);
+            }
+        }
+    });
+    
     return model;
 }
 

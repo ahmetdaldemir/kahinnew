@@ -12,9 +12,12 @@ async function initDatabase() {
                 symbol VARCHAR(20) NOT NULL,
                 timestamp DATETIME NOT NULL,
                 price DECIMAL(20,8) NOT NULL,
-                volume DECIMAL(20,8) NOT NULL,
+                high DECIMAL(20,8),
+                low DECIMAL(20,8),
+                volume DECIMAL(30,8),
+                timeframe VARCHAR(5) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY unique_data (symbol, timestamp)
+                UNIQUE KEY unique_data (symbol, timestamp, timeframe)
             )
         `);
         console.log('historical_data tablosu oluşturuldu');

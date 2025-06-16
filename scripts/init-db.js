@@ -1,59 +1,72 @@
-const { pool } = require('../db');
+require('dotenv').config();
+const { query } = require('../db');
 
-async function init() {
+async function initDatabase() {
     try {
+        console.log('MySQL veritabanı tabloları oluşturuluyor...');
+
         // historical_data tablosu
-        await pool.query(`
+        await query(`
             CREATE TABLE IF NOT EXISTS historical_data (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                symbol VARCHAR(32) NOT NULL,
+                symbol VARCHAR(20) NOT NULL,
                 timestamp DATETIME NOT NULL,
-                price DECIMAL(18,8) NOT NULL,
-                volume DECIMAL(18,8) NOT NULL,
-                UNIQUE(symbol, timestamp)
-            ) ENGINE=InnoDB;
+                price DECIMAL(20,8) NOT NULL,
+                high DECIMAL(20,8),
+                low DECIMAL(20,8),
+                volume DECIMAL(30,8),
+                timeframe VARCHAR(5) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_data (symbol, timestamp, timeframe)
+            )
         `);
+        console.log('historical_data tablosu oluşturuldu');
 
         // prediction_performance tablosu
-        await pool.query(`
+        await query(`
             CREATE TABLE IF NOT EXISTS prediction_performance (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                symbol VARCHAR(32) NOT NULL,
+                symbol VARCHAR(20) NOT NULL,
                 prediction_date DATETIME NOT NULL,
-                predicted_signal VARCHAR(8) NOT NULL,
-                confidence DECIMAL(8,4) NOT NULL,
-                actual_price DECIMAL(18,8) NOT NULL,
-                predicted_price DECIMAL(18,8) NOT NULL,
-                profit_loss DECIMAL(8,4) NOT NULL,
-                UNIQUE(symbol, prediction_date)
-            ) ENGINE=InnoDB;
+                predicted_signal ENUM('BUY', 'SELL') NOT NULL,
+                confidence DECIMAL(5,2) NOT NULL,
+                actual_price DECIMAL(20,8) NOT NULL,
+                predicted_price DECIMAL(20,8) NOT NULL,
+                profit_loss DECIMAL(10,2) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_prediction (symbol, prediction_date)
+            )
         `);
+        console.log('prediction_performance tablosu oluşturuldu');
 
         // coin_pairs tablosu
-        await pool.query(`
+        await query(`
             CREATE TABLE IF NOT EXISTS coin_pairs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                symbol VARCHAR(32) NOT NULL UNIQUE,
-                added_date DATETIME NOT NULL
-            ) ENGINE=InnoDB;
+                symbol VARCHAR(20) NOT NULL UNIQUE,
+                added_date DATETIME NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
         `);
-         // watch_list tablosu
-        await pool.query(`
+        console.log('coin_pairs tablosu oluşturuldu');
+
+        // watch_list tablosu
+        await query(`
             CREATE TABLE IF NOT EXISTS watch_list (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                symbol VARCHAR(32) NOT NULL UNIQUE,
+                symbol VARCHAR(20) NOT NULL UNIQUE,
                 confidence DECIMAL(5,2) NOT NULL,
-                last_update DATETIME NOT NULL,
-                added_date DATETIME NOT NULL
-            ) ENGINE=InnoDB;
+                last_update DATETIME NOT NULL
+            )
         `);
+        console.log('watch_list tablosu oluşturuldu');
 
-        console.log('MySQL tabloları başarıyla oluşturuldu!');
+        console.log('Tüm tablolar başarıyla oluşturuldu!');
         process.exit(0);
-    } catch (err) {
-        console.error('MySQL tablo oluşturma hatası:', err.message);
+    } catch (error) {
+        console.error('Veritabanı tabloları oluşturulurken hata:', error.message);
         process.exit(1);
     }
 }
 
-init(); 
+initDatabase(); 

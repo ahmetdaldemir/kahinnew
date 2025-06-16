@@ -32,24 +32,31 @@ async function fetchHistoricalData(symbol) {
         // Eğer son veri 24 saatten eskiyse veya hiç veri yoksa yeni veri çek
         if (!lastData || new Date(lastData) < oneDayAgo) {
             console.log(`Fetching new historical data for ${symbol}`);
-            const ohlcv = await binance.fetchOHLCV(symbol, '1h', undefined, 500);
             
-            if (!ohlcv || ohlcv.length === 0) {
-                console.log(`No data available for ${symbol}`);
-                return;
-            }
+            // Farklı zaman dilimleri için veri çek
+            const timeframes = ['1h', '4h', '1d'];
+            for (const timeframe of timeframes) {
+                console.log(`Fetching ${timeframe} data for ${symbol}`);
+                const ohlcv = await binance.fetchOHLCV(symbol, timeframe, undefined, 2000);
+                
+                if (!ohlcv || ohlcv.length === 0) {
+                    console.log(`No ${timeframe} data available for ${symbol}`);
+                    continue;
+                }
 
-            let newRecords = 0;
-            for (const candle of ohlcv) {
-                const [timestamp, open, high, low, close, volume] = candle;
-                const result = await query(
-                    `INSERT IGNORE INTO historical_data (symbol, timestamp, price, high, low, volume) 
-                     VALUES (?, FROM_UNIXTIME(?/1000), ?, ?, ?, ?)`,
-                    [symbol, timestamp, close, high, low, volume]
-                );
-                if (result.affectedRows > 0) newRecords++;
+                let newRecords = 0;
+                for (const candle of ohlcv) {
+                    const [timestamp, open, high, low, close, volume] = candle;
+                    const result = await query(
+                        `INSERT IGNORE INTO historical_data 
+                         (symbol, timestamp, price, high, low, volume, timeframe) 
+                         VALUES (?, FROM_UNIXTIME(?/1000), ?, ?, ?, ?, ?)`,
+                        [symbol, timestamp, close, high, low, volume, timeframe]
+                    );
+                    if (result.affectedRows > 0) newRecords++;
+                }
+                console.log(`Stored ${newRecords} new ${timeframe} records for ${symbol}`);
             }
-            console.log(`Stored ${newRecords} new historical records for ${symbol}`);
         }
     } catch (error) {
         console.error(`Error fetching historical data for ${symbol}:`, error);
