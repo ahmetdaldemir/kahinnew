@@ -45,9 +45,9 @@ async function fetchRealtimeData(symbol, timeframe) {
             for (const candle of ohlcv) {
                 const [timestamp, open, high, low, close, volume] = candle;
                 const result = await query(
-                    `INSERT IGNORE INTO historical_data (symbol, timestamp, price, volume, timeframe) 
-                     VALUES (?, FROM_UNIXTIME(?/1000), ?, ?, ?)`,
-                    [symbol, timestamp, close, volume, timeframe]
+                    `INSERT IGNORE INTO historical_data (symbol, timestamp, price, high, low, volume, timeframe) 
+                     VALUES (?, FROM_UNIXTIME(?/1000), ?, ?, ?, ?, ?)`,
+                    [symbol, timestamp, close, high, low, volume, timeframe]
                 );
                 if (result.affectedRows > 0) newRecords++;
             }

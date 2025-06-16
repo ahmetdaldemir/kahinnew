@@ -43,41 +43,19 @@ async function fetchHistoricalData(symbol) {
             for (const candle of ohlcv) {
                 const [timestamp, open, high, low, close, volume] = candle;
                 const result = await query(
-                    `INSERT IGNORE INTO historical_data (symbol, timestamp, price, volume) 
-                     VALUES (?, FROM_UNIXTIME(?/1000), ?, ?)`,
-                    [symbol, timestamp, close, volume]
+                    `INSERT IGNORE INTO historical_data (symbol, timestamp, price, high, low, volume) 
+                     VALUES (?, FROM_UNIXTIME(?/1000), ?, ?, ?, ?)`,
+                    [symbol, timestamp, close, high, low, volume]
                 );
                 if (result.affectedRows > 0) newRecords++;
             }
             console.log(`Stored ${newRecords} new historical records for ${symbol}`);
-        } else {
-            console.log(`Recent data already exists for ${symbol}, skipping...`);
         }
     } catch (error) {
-        console.error(`Error processing historical data for ${symbol}:`, error.message);
+        console.error(`Error fetching historical data for ${symbol}:`, error);
     }
 }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function main() {
-    try {
-        console.log('Starting historical data check...');
-        const pairs = await query('SELECT symbol FROM coin_pairs');
-        console.log(`Found ${pairs.length} pairs to check`);
-
-        for (const row of pairs) {
-            await fetchHistoricalData(row.symbol);
-            await sleep(1000);
-        }
-        console.log('Historical data check completed');
-        process.exit(0);
-    } catch (error) {
-        console.error('Error in main process:', error);
-        process.exit(1);
-    }
-}
-
-main(); 
+module.exports = {
+    fetchHistoricalData
+};
