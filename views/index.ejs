@@ -189,10 +189,10 @@
                                                 <%= (coin.change24h || 0).toFixed(2) %>%
                                             </td>
                                             <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 40 ? 'confidence-medium' : 'confidence-low' %>">
-                                                <%= coin.confidence.toFixed(2) %>%
+                                                <%= parseFloat(coin.confidence).toFixed(2) %>%
                                             </td>
                                             <td class="<%= coin.profit_loss >= 0 ? 'trend-up' : 'trend-down' %>">
-                                                <%= coin.profit_loss.toFixed(2) %>%
+                                                <%= parseFloat(coin.profit_loss).toFixed(2) %>%
                                             </td>
                                             <td>
                                                 <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
@@ -237,7 +237,7 @@
                                         <tr>
                                             <td><strong><%= coin.symbol %></strong></td>
                                             <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 40 ? 'confidence-medium' : 'confidence-low' %>">
-                                                <%= coin.confidence.toFixed(2) %>%
+                                                <%= parseFloat(coin.confidence).toFixed(2) %>%
                                             </td>
                                             <td>$<%= parseFloat(coin.current_price).toFixed(2) %></td>
                                             <td class="<%= coin.change24h >= 0 ? 'trend-up' : 'trend-down' %>">
@@ -245,7 +245,7 @@
                                                 <%= coin.change24h.toFixed(2) %>%
                                             </td>
                                             <td class="<%= coin.profit_loss >= 0 ? 'trend-up' : 'trend-down' %>">
-                                                <%= coin.profit_loss.toFixed(2) %>%
+                                                <%= parseFloat(coin.profit_loss).toFixed(2) %>%
                                             </td>
                                             <td>
                                                 <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
@@ -290,10 +290,10 @@
                                         <tr>
                                             <td><strong><%= coin.symbol %></strong></td>
                                             <td class="trend-up">
-                                                <%= coin.profit_loss.toFixed(2) %>%
+                                                <%= parseFloat(coin.profit_loss).toFixed(2) %>%
                                             </td>
                                             <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 40 ? 'confidence-medium' : 'confidence-low' %>">
-                                                <%= coin.confidence.toFixed(2) %>%
+                                                <%= parseFloat(coin.confidence).toFixed(2) %>%
                                             </td>
                                             <td>$<%= parseFloat(coin.current_price).toFixed(2) %></td>
                                             <td class="<%= coin.change24h >= 0 ? 'trend-up' : 'trend-down' %>">
