@@ -177,7 +177,7 @@ async function trainModel(features, labels) {
     const earlyStopping = tf.callbacks.earlyStopping({
         monitor: 'val_loss',
         patience: 5,
-        restoreBestWeights: true
+       // restoreBestWeights: true
     });
 
     // Train model
