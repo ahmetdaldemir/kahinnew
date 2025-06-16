@@ -2,8 +2,61 @@ require('dotenv').config();
 const tf = require('@tensorflow/tfjs-node');
 const { query } = require('../db');
 const moment = require('moment');
+const ti = require('technicalindicators');
 
 // Technical indicators calculation
+function calculateEMA(prices, period = 20) {
+    if (prices.length < period) return prices[prices.length - 1];
+    return ti.EMA.calculate({ period, values: prices }).slice(-1)[0] || prices[prices.length - 1];
+}
+
+function calculateSMA(prices, period = 20) {
+    if (prices.length < period) return prices[prices.length - 1];
+    return ti.SMA.calculate({ period, values: prices }).slice(-1)[0] || prices[prices.length - 1];
+}
+
+function calculateStochastic(high, low, close, period = 14, signalPeriod = 3) {
+    if (high.length < period || low.length < period || close.length < period) return { k: 50, d: 50 };
+    const result = ti.Stochastic.calculate({ high, low, close, period, signalPeriod });
+    return result.length > 0 ? result[result.length - 1] : { k: 50, d: 50 };
+}
+
+function calculateADX(high, low, close, period = 14) {
+    if (high.length < period || low.length < period || close.length < period) return 20;
+    const result = ti.ADX.calculate({ high, low, close, period });
+    return result.length > 0 ? result[result.length - 1].adx : 20;
+}
+
+function calculateCCI(high, low, close, period = 20) {
+    if (high.length < period || low.length < period || close.length < period) return 0;
+    const result = ti.CCI.calculate({ high, low, close, period });
+    return result.length > 0 ? result[result.length - 1] : 0;
+}
+
+function calculateWilliamsR(high, low, close, period = 14) {
+    if (high.length < period || low.length < period || close.length < period) return -50;
+    const result = ti.WilliamsR.calculate({ high, low, close, period });
+    return result.length > 0 ? result[result.length - 1] : -50;
+}
+
+function calculateParabolicSAR(high, low, step = 0.02, max = 0.2) {
+    if (high.length < 2 || low.length < 2) return high[high.length - 1];
+    const result = ti.PSAR.calculate({ high, low, step, max });
+    return result.length > 0 ? result[result.length - 1] : high[high.length - 1];
+}
+
+function calculateATR(high, low, close, period = 14) {
+    if (high.length < period || low.length < period || close.length < period) return 0;
+    const result = ti.ATR.calculate({ high, low, close, period });
+    return result.length > 0 ? result[result.length - 1] : 0;
+}
+
+function calculateOBV(close, volume) {
+    if (close.length < 2 || volume.length < 2) return 0;
+    const result = ti.OBV.calculate({ close, volume });
+    return result.length > 0 ? result[result.length - 1] : 0;
+}
+
 function calculateRSI(prices, period = 14) {
     if (prices.length < period + 1) {
         return 50; // Default value if not enough data
@@ -76,6 +129,8 @@ function prepareData(data) {
     // Calculate additional features
     const prices = data.map(row => parseFloat(row.price));
     const volumes = data.map(row => parseFloat(row.volume));
+    const highs = data.map(row => parseFloat(row.high || row.price));
+    const lows = data.map(row => parseFloat(row.low || row.price));
     
     const features = data.map((row, index) => {
         const price = parseFloat(row.price);
@@ -94,6 +149,17 @@ function prepareData(data) {
         const { macd, signal, histogram } = calculateMACD(prices.slice(0, index + 1));
         const { upper, middle, lower } = calculateBollingerBands(prices.slice(0, index + 1));
         
+        // Additional technical indicators
+        const ema = calculateEMA(prices.slice(0, index + 1));
+        const sma = calculateSMA(prices.slice(0, index + 1));
+        const stoch = calculateStochastic(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
+        const adx = calculateADX(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
+        const cci = calculateCCI(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
+        const willr = calculateWilliamsR(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
+        const psar = calculateParabolicSAR(highs.slice(0, index + 1), lows.slice(0, index + 1));
+        const atr = calculateATR(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
+        const obv = calculateOBV(prices.slice(0, index + 1), volumes.slice(0, index + 1));
+        
         return [
             price,
             volume,
@@ -107,7 +173,17 @@ function prepareData(data) {
             histogram,
             upper,
             middle,
-            lower
+            lower,
+            ema,
+            sma,
+            stoch.k,
+            stoch.d,
+            adx,
+            cci,
+            willr,
+            psar,
+            atr,
+            obv
         ];
     });
 
