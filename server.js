@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const { spawn, execSync, exec } = require('child_process');
 const { query } = require('./db');
+const { fetchUptrendCoins, fetchHighConfidenceCoins, fetchHighProfitCoins } = require('./scripts/dashboard');
 
 const app = express();
 const port = process.env.PORT || 3200;
@@ -78,6 +79,10 @@ function startExpressServer() {
                  ORDER BY p.confidence DESC, p.profit_loss DESC`
             );
 
+            const uptrendCoins = await fetchUptrendCoins();
+            const highConfidenceCoins = await fetchHighConfidenceCoins();
+            const highProfitCoins = await fetchHighProfitCoins();
+
             const lastUpdate = new Date().toLocaleString('tr-TR', {
                 year: 'numeric',
                 month: 'long',
@@ -90,6 +95,9 @@ function startExpressServer() {
             res.render('index', {
                 predictions1h,
                 predictions4h,
+                uptrendCoins,
+                highConfidenceCoins,
+                highProfitCoins,
                 lastUpdate
             });
         } catch (error) {
@@ -97,6 +105,9 @@ function startExpressServer() {
             res.render('index', {
                 predictions1h: [],
                 predictions4h: [],
+                uptrendCoins: [],
+                highConfidenceCoins: [],
+                highProfitCoins: [],
                 lastUpdate: new Date().toLocaleString('tr-TR')
             });
         }
