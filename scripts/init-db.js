@@ -37,12 +37,13 @@ async function init() {
                 added_date DATETIME NOT NULL
             ) ENGINE=InnoDB;
         `);
-
-        // watch_list tablosu
+         // watch_list tablosu
         await pool.query(`
             CREATE TABLE IF NOT EXISTS watch_list (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 symbol VARCHAR(32) NOT NULL UNIQUE,
+                confidence DECIMAL(5,2) NOT NULL,
+                last_update DATETIME NOT NULL,
                 added_date DATETIME NOT NULL
             ) ENGINE=InnoDB;
         `);

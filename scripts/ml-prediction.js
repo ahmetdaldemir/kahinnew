@@ -200,6 +200,9 @@ function prepareData(data) {
     // Normalize features
     const normalizedFeatures = features.map(feature => normalizeData(feature));
 
+    // NaN'ları 0 ile değiştir
+    const safeFeatures = normalizedFeatures.map(f => f.map(x => isNaN(x) ? 0 : x));
+
     // Create labels based on future price movement
     const labels = data.map((row, index) => {
         if (index >= data.length - 1) return 0;
@@ -209,7 +212,7 @@ function prepareData(data) {
     });
 
     // Feature ve label NaN kontrolü
-    normalizedFeatures.forEach((f, i) => {
+    safeFeatures.forEach((f, i) => {
         if (f.some(Number.isNaN)) {
             console.error('NaN feature:', f, 'index:', i, 'row:', data[i]);
         }
@@ -220,8 +223,8 @@ function prepareData(data) {
         }
     });
 
-    console.log(`Prepared ${normalizedFeatures.length} samples for training`);
-    return { features: normalizedFeatures, labels };
+    console.log(`Prepared ${safeFeatures.length} samples for training`);
+    return { features: safeFeatures, labels };
 }
 
 // Normalize data
