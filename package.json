@@ -14,7 +14,7 @@
     "@tensorflow/tfjs-node": "^4.22.0",
     "ccxt": "^4.2.15",
     "chart.js": "^4.5.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.5.0",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
     "ml-random-forest": "^2.1.0",

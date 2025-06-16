@@ -133,6 +133,10 @@ async function main() {
 main();
 
 module.exports = {
+    fetchUptrendCoins,
+    fetchDowntrendCoins,
+    fetchHighConfidenceCoins,
+    fetchHighProfitCoins,
     fetchTopProfitCoins,
     fetchTopConfidenceCoins
 }; 
