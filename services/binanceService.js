@@ -33,15 +33,15 @@ class BinanceService {
 
     async getCurrentPrices() {
         return this.retryOperation(async () => {
-            try {
-                const tickers = await this.binance.prices();
+        try {
+            const tickers = await this.binance.prices();
                 if (!tickers || typeof tickers !== 'object') {
                     throw new Error('Invalid response from Binance API: prices data is missing or invalid');
                 }
-                return tickers;
-            } catch (error) {
-                console.error('Error fetching current prices:', error);
-                throw error;
+            return tickers;
+        } catch (error) {
+            console.error('Error fetching current prices:', error);
+            throw error;
             }
         });
     }
@@ -76,9 +76,9 @@ class BinanceService {
             
             const candles = await new Promise((resolve, reject) => {
                 this.binance.candlesticks(symbol, interval, {
-                    startTime,
-                    endTime,
-                    limit
+                startTime,
+                endTime,
+                limit
                 }, (error, data) => {
                     if (error) {
                         console.error(`Error in candlesticks callback for ${symbol}:`, error);
@@ -107,12 +107,12 @@ class BinanceService {
                     return null;
                 }
                 return {
-                    timestamp: candle[0],
-                    open: parseFloat(candle[1]),
-                    high: parseFloat(candle[2]),
-                    low: parseFloat(candle[3]),
-                    close: parseFloat(candle[4]),
-                    volume: parseFloat(candle[5])
+                timestamp: candle[0],
+                open: parseFloat(candle[1]),
+                high: parseFloat(candle[2]),
+                low: parseFloat(candle[3]),
+                close: parseFloat(candle[4]),
+                volume: parseFloat(candle[5])
                 };
             }).filter(candle => candle !== null);
         } catch (error) {

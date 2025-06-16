@@ -38,7 +38,7 @@ class MLService {
                 units: 3, // BUY, SELL, HOLD
                 activation: 'softmax'
             }));
-
+        
             // Model derleme
             this.model.compile({
                 optimizer: tf.train.adam(0.001),
@@ -73,7 +73,7 @@ class MLService {
             const sequences = [];
             for (let i = 0; i < normalizedFeatures.length - 30; i++) {
                 sequences.push(normalizedFeatures.slice(i, i + 30));
-            }
+        }
 
             return tf.tensor3d(sequences);
         } catch (error) {
@@ -113,7 +113,7 @@ class MLService {
             const inputData = await this.prepareData(historicalData);
             if (!inputData) {
                 throw new Error('Failed to prepare input data');
-            }
+        }
 
             // Etiketleri hazırla
             const labels = historicalData.slice(30).map(data => {
@@ -140,14 +140,14 @@ class MLService {
         } catch (error) {
             console.error(`Error training model for ${symbol}:`, error);
             return false;
-        }
+    }
     }
 
     async predict(symbol, currentData) {
         try {
             if (!this.isModelLoaded) {
                 throw new Error('Model not initialized');
-            }
+        }
 
             // Mevcut veriyi hazırla
             const features = [
@@ -169,7 +169,7 @@ class MLService {
             // En yüksek olasılıklı sinyali bul
             const maxIndex = prediction.indexOf(Math.max(...prediction));
             const signal = maxIndex === 0 ? 'BUY' : maxIndex === 1 ? 'SELL' : 'HOLD';
-            
+        
             // Tahmin performansını kaydet
             await databaseService.updatePredictionPerformance(symbol, {
                 predictionDate: new Date(),
@@ -179,7 +179,7 @@ class MLService {
                 profitLoss: null // Kar/zarar henüz hesaplanamıyor
             });
 
-            return {
+        return {
                 signal,
                 probabilities: {
                     buy: prediction[0],
@@ -212,8 +212,8 @@ class MLService {
                     }
                     if (pred.profit_loss) {
                         totalProfitLoss += pred.profit_loss;
-                    }
-                }
+    }
+}
             });
 
             return {

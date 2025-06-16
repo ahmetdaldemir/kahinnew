@@ -96,7 +96,7 @@
                                             <td>
                                                 <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
                                                     <%= coin.predicted_signal %>
-                                                </span>
+                    </span>
                                             </td>
                                         </tr>
                                     <% }); %>
@@ -159,14 +159,14 @@
         <!-- Yükseliş Trendindeki Coinler -->
         <div class="row mb-4">
             <div class="col">
-                <div class="card">
+                            <div class="card">
                     <div class="card-header bg-success text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-arrow-up me-2"></i>
                             Yükseliş Trendindeki Coinler
                         </h5>
                     </div>
-                    <div class="card-body">
+                                <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -197,17 +197,17 @@
                                             <td>
                                                 <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
                                                     <%= coin.predicted_signal %>
-                                                </span>
+                                        </span>
                                             </td>
                                         </tr>
                                     <% }); %>
                                 </tbody>
                             </table>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- En Yüksek Güven Oranlı Coinler -->
         <div class="row mb-4">
@@ -253,7 +253,7 @@
                                                 </span>
                                             </td>
                                         </tr>
-                                    <% }); %>
+                    <% }); %>
                                 </tbody>
                             </table>
                         </div>
@@ -265,14 +265,14 @@
         <!-- En Yüksek Kar Potansiyelli Coinler -->
         <div class="row">
             <div class="col">
-                <div class="card">
+                            <div class="card">
                     <div class="card-header bg-warning text-dark">
                         <h5 class="mb-0">
                             <i class="fas fa-chart-line me-2"></i>
                             En Yüksek Kar Potansiyelli Coinler
                         </h5>
                     </div>
-                    <div class="card-body">
+                                <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -303,13 +303,107 @@
                                             <td>
                                                 <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
                                                     <%= coin.predicted_signal %>
-                                                </span>
+                                        </span>
                                             </td>
                                         </tr>
                                     <% }); %>
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- %5+ Kar Potansiyelli İlk 10 Coin Tablosu -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-coins me-2"></i>
+                            %5+ Kar Potansiyelli İlk 10 Coin (Anlık)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Sembol</th>
+                                        <th>Kar Potansiyeli</th>
+                                        <th>Güven Oranı</th>
+                                        <th>Güncel Fiyat</th>
+                                        <th>Sinyal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% topProfitCoins.forEach(coin => { %>
+                                        <tr>
+                                            <td><strong><%= coin.symbol %></strong></td>
+                                            <td class="trend-up">
+                                                <%= parseFloat(coin.profit_loss).toFixed(2) %>%
+                                            </td>
+                                            <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 50 ? 'confidence-medium' : 'confidence-low' %>">
+                                                <%= parseFloat(coin.confidence).toFixed(2) %>%
+                                            </td>
+                                            <td>$<%= parseFloat(coin.actual_price).toFixed(2) %></td>
+                                            <td>
+                                                <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
+                                                    <%= coin.predicted_signal %>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- %50+ Güven Oranlı İlk 10 Coin Tablosu -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            %50+ Güven Oranlı İlk 10 Coin (Yapay Zeka)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Sembol</th>
+                                        <th>Güven Oranı</th>
+                                        <th>Kar Potansiyeli</th>
+                                        <th>Güncel Fiyat</th>
+                                        <th>Sinyal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% topConfidenceCoins.forEach(coin => { %>
+                                        <tr>
+                                            <td><strong><%= coin.symbol %></strong></td>
+                                            <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 50 ? 'confidence-medium' : 'confidence-low' %>">
+                                                <%= parseFloat(coin.confidence).toFixed(2) %>%
+                                            </td>
+                                            <td class="trend-up">
+                                                <%= parseFloat(coin.profit_loss).toFixed(2) %>%
+                                            </td>
+                                            <td>$<%= parseFloat(coin.actual_price).toFixed(2) %></td>
+                                            <td>
+                                                <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : 'danger' %>">
+                                                    <%= coin.predicted_signal %>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -322,20 +416,20 @@
             fetch('/api/run-predictions', {
                 method: 'POST'
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
                     alert('Tahminler güncelleniyor...');
                     setTimeout(() => {
                         window.location.reload();
                     }, 5000);
-                } else {
+                    } else {
                     alert('Tahmin güncelleme hatası: ' + data.error);
-                }
-            })
-            .catch(error => {
+                    }
+                })
+                .catch(error => {
                 alert('Bir hata oluştu: ' + error);
-            });
+                });
         }
     </script>
 </body>

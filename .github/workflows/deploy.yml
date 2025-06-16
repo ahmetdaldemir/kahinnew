@@ -40,7 +40,7 @@ jobs:
         target: "/var/www/html/kahin"
         strip_components: 0
         debug: true
-
+    
     - name: Deploy to Server
       uses: appleboy/ssh-action@master
       with:

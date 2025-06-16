@@ -7,85 +7,95 @@ const ti = require('technicalindicators');
 // Technical indicators calculation
 function calculateEMA(prices, period = 20) {
     if (prices.length < period) return prices[prices.length - 1];
-    return ti.EMA.calculate({ period, values: prices }).slice(-1)[0] || prices[prices.length - 1];
+    const val = ti.EMA.calculate({ period, values: prices }).slice(-1)[0] || prices[prices.length - 1];
+    return isNaN(val) ? prices[prices.length - 1] : val;
 }
 
 function calculateSMA(prices, period = 20) {
     if (prices.length < period) return prices[prices.length - 1];
-    return ti.SMA.calculate({ period, values: prices }).slice(-1)[0] || prices[prices.length - 1];
+    const val = ti.SMA.calculate({ period, values: prices }).slice(-1)[0] || prices[prices.length - 1];
+    return isNaN(val) ? prices[prices.length - 1] : val;
 }
 
 function calculateStochastic(high, low, close, period = 14, signalPeriod = 3) {
     if (high.length < period || low.length < period || close.length < period) return { k: 50, d: 50 };
     const result = ti.Stochastic.calculate({ high, low, close, period, signalPeriod });
-    return result.length > 0 ? result[result.length - 1] : { k: 50, d: 50 };
+    const last = result.length > 0 ? result[result.length - 1] : { k: 50, d: 50 };
+    return {
+        k: isNaN(last.k) ? 50 : last.k,
+        d: isNaN(last.d) ? 50 : last.d
+    };
 }
 
 function calculateADX(high, low, close, period = 14) {
     if (high.length < period || low.length < period || close.length < period) return 20;
     const result = ti.ADX.calculate({ high, low, close, period });
-    return result.length > 0 ? result[result.length - 1].adx : 20;
+    const adx = result.length > 0 ? result[result.length - 1].adx : 20;
+    return isNaN(adx) ? 20 : adx;
 }
 
 function calculateCCI(high, low, close, period = 20) {
     if (high.length < period || low.length < period || close.length < period) return 0;
     const result = ti.CCI.calculate({ high, low, close, period });
-    return result.length > 0 ? result[result.length - 1] : 0;
+    const val = result.length > 0 ? result[result.length - 1] : 0;
+    return isNaN(val) ? 0 : val;
 }
 
 function calculateWilliamsR(high, low, close, period = 14) {
     if (high.length < period || low.length < period || close.length < period) return -50;
     const result = ti.WilliamsR.calculate({ high, low, close, period });
-    return result.length > 0 ? result[result.length - 1] : -50;
+    const val = result.length > 0 ? result[result.length - 1] : -50;
+    return isNaN(val) ? -50 : val;
 }
 
 function calculateParabolicSAR(high, low, step = 0.02, max = 0.2) {
     if (high.length < 2 || low.length < 2) return high[high.length - 1];
     const result = ti.PSAR.calculate({ high, low, step, max });
-    return result.length > 0 ? result[result.length - 1] : high[high.length - 1];
+    const val = result.length > 0 ? result[result.length - 1] : high[high.length - 1];
+    return isNaN(val) ? high[high.length - 1] : val;
 }
 
 function calculateATR(high, low, close, period = 14) {
     if (high.length < period || low.length < period || close.length < period) return 0;
     const result = ti.ATR.calculate({ high, low, close, period });
-    return result.length > 0 ? result[result.length - 1] : 0;
+    const val = result.length > 0 ? result[result.length - 1] : 0;
+    return isNaN(val) ? 0 : val;
 }
 
 function calculateOBV(close, volume) {
     if (close.length < 2 || volume.length < 2) return 0;
     const result = ti.OBV.calculate({ close, volume });
-    return result.length > 0 ? result[result.length - 1] : 0;
+    const val = result.length > 0 ? result[result.length - 1] : 0;
+    return isNaN(val) ? 0 : val;
 }
 
 function calculateRSI(prices, period = 14) {
-    if (prices.length < period + 1) {
-        return 50; // Default value if not enough data
-    }
-
+    if (prices.length < period + 1) return 50; // Default value if not enough data
     const changes = prices.slice(1).map((price, i) => price - prices[i]);
     const gains = changes.map(change => change > 0 ? change : 0);
     const losses = changes.map(change => change < 0 ? -change : 0);
-    
     const avgGain = gains.slice(-period).reduce((a, b) => a + b, 0) / period;
     const avgLoss = losses.slice(-period).reduce((a, b) => a + b, 0) / period;
-    
     if (avgLoss === 0) return 100;
     const rs = avgGain / avgLoss;
-    return 100 - (100 / (1 + rs));
+    const rsi = 100 - (100 / (1 + rs));
+    return isNaN(rsi) ? 50 : rsi;
 }
 
 function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
     if (prices.length < slowPeriod) {
         return { macd: 0, signal: 0, histogram: 0 };
     }
-
     const fastEMA = prices.slice(-fastPeriod).reduce((a, b) => a + b, 0) / fastPeriod;
     const slowEMA = prices.slice(-slowPeriod).reduce((a, b) => a + b, 0) / slowPeriod;
     const macd = fastEMA - slowEMA;
     const signal = prices.slice(-signalPeriod).reduce((a, b) => a + b, 0) / signalPeriod;
     const histogram = macd - signal;
-    
-    return { macd, signal, histogram };
+    return {
+        macd: isNaN(macd) ? 0 : macd,
+        signal: isNaN(signal) ? 0 : signal,
+        histogram: isNaN(histogram) ? 0 : histogram
+    };
 }
 
 function calculateBollingerBands(prices, period = 20, stdDev = 2) {
@@ -96,16 +106,16 @@ function calculateBollingerBands(prices, period = 20, stdDev = 2) {
             lower: prices[prices.length - 1]
         };
     }
-
     const sma = prices.slice(-period).reduce((a, b) => a + b, 0) / period;
     const squaredDiffs = prices.slice(-period).map(price => Math.pow(price - sma, 2));
     const variance = squaredDiffs.reduce((a, b) => a + b, 0) / period;
     const standardDeviation = Math.sqrt(variance);
-    
+    const upper = sma + (standardDeviation * stdDev);
+    const lower = sma - (standardDeviation * stdDev);
     return {
-        upper: sma + (standardDeviation * stdDev),
-        middle: sma,
-        lower: sma - (standardDeviation * stdDev)
+        upper: isNaN(upper) ? sma : upper,
+        middle: isNaN(sma) ? prices[prices.length - 1] : sma,
+        lower: isNaN(lower) ? sma : lower
     };
 }
 
@@ -198,6 +208,18 @@ function prepareData(data) {
         return futurePrice > currentPrice ? 1 : 0;
     });
 
+    // Feature ve label NaN kontrolü
+    normalizedFeatures.forEach((f, i) => {
+        if (f.some(Number.isNaN)) {
+            console.error('NaN feature:', f, 'index:', i, 'row:', data[i]);
+        }
+    });
+    labels.forEach((l, i) => {
+        if (Number.isNaN(l)) {
+            console.error('NaN label:', l, 'index:', i, 'row:', data[i]);
+        }
+    });
+
     console.log(`Prepared ${normalizedFeatures.length} samples for training`);
     return { features: normalizedFeatures, labels };
 }
@@ -206,11 +228,19 @@ function prepareData(data) {
 function normalizeData(data) {
     const min = Math.min(...data);
     const max = Math.max(...data);
+    if (min === max) {
+        // Tüm değerler aynıysa, hepsini 0.5 yap
+        return data.map(() => 0.5);
+    }
     return data.map(x => (x - min) / (max - min));
 }
 
 // Train ML model
 async function trainModel(features, labels) {
+    // NaN kontrolü
+    if (features.some(f => f.some(Number.isNaN)) || labels.some(Number.isNaN)) {
+        console.error('Feature veya label içinde NaN tespit edildi!');
+    }
     console.log('Training ML model...');
     
     // Create a simplified model
@@ -239,10 +269,13 @@ async function trainModel(features, labels) {
     }));
     
     // Compile model with a lower learning rate
+    const learningRate = 0.001; // Düşük öğrenme oranı
+    const clipValue = 1.0; // Gradyan kırpma değeri
     model.compile({
-        optimizer: tf.train.adam(0.0001),
+        optimizer: tf.train.adam(learningRate),
         loss: 'binaryCrossentropy',
-        metrics: ['accuracy']
+        metrics: ['accuracy'],
+        clipValue: clipValue
     });
 
     // Prepare data
@@ -270,6 +303,11 @@ async function trainModel(features, labels) {
     // Save model weights to data folder
     await model.save('file://./data/model-weights');
     console.log('Model weights saved to data folder');
+
+    // Log weights and biases during training
+    const weights = model.getWeights();
+    console.log('Ağırlıklar:', weights[0]);
+    console.log('Bias:', weights[1]);
 
     return model;
 }
@@ -300,7 +338,8 @@ async function generatePredictions(symbol) {
             currentPrice: parseFloat(data[data.length - 1].price).toFixed(2),
             predictedPrice: parseFloat(data[data.length - 1].price).toFixed(2),
             priceChange24h: calculatePriceChange(data, 24).toFixed(2),
-            volume24h: calculateVolume24h(data).toFixed(2)
+            volume24h: calculateVolume24h(data).toFixed(2),
+            lastTimestamp: data[data.length - 1].timestamp
         };
 
         console.log('DB kayıt:', result);
@@ -346,14 +385,49 @@ async function main() {
             try {
                 console.log(`\nAnalyzing ${row.symbol}...`);
                 const result = await generatePredictions(row.symbol);
+                console.log('resultPre:', result);
                 if (result) {
-                    results.push(result);
+                    // Her coin için sonucu hemen kaydet
+                    // NaN kontrolü
+                    if (
+                        isNaN(Number(result.confidence)) ||
+                        isNaN(Number(result.profit)) ||
+                        isNaN(Number(result.currentPrice)) ||
+                        isNaN(Number(result.predictedPrice))
+                    ) {
+                        console.error('NaN değer tespit edildi, kayıt yapılmıyor:', result);
+                        continue;
+                    }
+                    try {
+                        const predictionDate = moment(result.lastTimestamp).format('YYYY-MM-DD HH:mm:ss');
+                        console.log('Kayıt döngüsüne girildi:', result.symbol, predictionDate);
+                        const sql = `INSERT INTO prediction_performance (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss)
+                             VALUES (?, ?, ?, ?, ?, ?, ?)
+                             ON DUPLICATE KEY UPDATE predicted_signal=VALUES(predicted_signal), confidence=VALUES(confidence), actual_price=VALUES(actual_price), predicted_price=VALUES(predicted_price), profit_loss=VALUES(profit_loss)`;
+                        const params = [
+                            result.symbol,
+                            predictionDate,
+                            result.signal,
+                            result.confidence,
+                            result.currentPrice,
+                            result.predictedPrice,
+                            result.profit
+                        ];
+                        console.log('SQL:', sql);
+                        console.log('Params:', params);
+                        const insertResult = await query(sql, params);
+                        console.log('Insert result:', insertResult);
+                    } catch (e) {
+                        console.error(`DB kayıt hatası (${result.symbol}):`, e.message, 'Params:', params);
+                    }
                 }
             } catch (error) {
                 console.error(`Error analyzing ${row.symbol}:`, error);
                 continue;
             }
         }
+
+        console.log('resultsNew:', results);
 
         // Sort results by confidence and profit
         results.sort((a, b) => {
@@ -365,36 +439,65 @@ async function main() {
         // Take top 50 results
         const topResults = results.slice(0, 50);
 
+        // Log results and topResults
+        console.log('results length:', results.length);
+        console.log('topResults length:', topResults.length);
+        console.log('results:', results);
+        console.log('topResults:', topResults);
+
+        // Kayıt döngüsüne girmeden önce topResults içeriğini göster
+        if (topResults.length === 0) {
+            console.warn('UYARI: Kayıt döngüsüne girilmiyor, topResults boş!');
+        }
+
         console.log('\nTop 50 Predictions:');
         console.table(topResults);
 
         // Save predictions to database
+        let savedCount = 0;
         for (const result of topResults) {
+            // NaN kontrolü
+            if (
+                isNaN(Number(result.confidence)) ||
+                isNaN(Number(result.profit)) ||
+                isNaN(Number(result.currentPrice)) ||
+                isNaN(Number(result.predictedPrice))
+            ) {
+                console.error('NaN değer tespit edildi, kayıt yapılmıyor:', result);
+                continue;
+            }
             try {
-                await query(
-                    `INSERT INTO prediction_performance (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss)
+                const predictionDate = moment(result.lastTimestamp).format('YYYY-MM-DD HH:mm:ss');
+                console.log('Kayıt döngüsüne girildi:', result.symbol, predictionDate);
+                const sql = `INSERT INTO prediction_performance (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss)
                      VALUES (?, ?, ?, ?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE predicted_signal=VALUES(predicted_signal), confidence=VALUES(confidence), actual_price=VALUES(actual_price), predicted_price=VALUES(predicted_price), profit_loss=VALUES(profit_loss)`,
-                    [
-                        result.symbol,
-                        moment().format('YYYY-MM-DD HH:mm:ss'),
-                        result.signal,
-                        result.confidence,
-                        result.currentPrice,
-                        result.predictedPrice,
-                        result.profit
-                    ]
-                );
+                     ON DUPLICATE KEY UPDATE predicted_signal=VALUES(predicted_signal), confidence=VALUES(confidence), actual_price=VALUES(actual_price), predicted_price=VALUES(predicted_price), profit_loss=VALUES(profit_loss)`;
+                const params = [
+                    result.symbol,
+                    predictionDate,
+                    result.signal,
+                    result.confidence,
+                    result.currentPrice,
+                    result.predictedPrice,
+                    result.profit
+                ];
+                console.log('SQL:', sql);
+                console.log('Params:', params);
+                const insertResult = await query(sql, params);
+                console.log('Insert result:', insertResult);
+                if (insertResult.affectedRows > 0) {
+                    savedCount++;
+                }
             } catch (e) {
-                console.error('DB kayıt hatası:', e.message);
+                console.error(`DB kayıt hatası (${result.symbol}):`, e.message, 'Params:', params);
             }
         }
 
-        console.log('Predictions saved to database');
-        process.exit(0);
+        console.log(`Predictions saved to database: ${savedCount} records`);
+        // process.exit(0);
     } catch (error) {
         console.error('Error in main process:', error);
-        process.exit(1);
+        // process.exit(1);
     }
 }
 

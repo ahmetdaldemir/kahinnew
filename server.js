@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { spawn, execSync, exec } = require('child_process');
 const { query } = require('./db');
-const { fetchUptrendCoins, fetchHighConfidenceCoins, fetchHighProfitCoins } = require('./scripts/dashboard');
+const { fetchUptrendCoins, fetchHighConfidenceCoins, fetchHighProfitCoins, fetchTopProfitCoins, fetchTopConfidenceCoins } = require('./scripts/dashboard');
 
 const app = express();
 const port = process.env.PORT || 3200;
@@ -49,11 +49,10 @@ function startExpressServer() {
                          GROUP BY symbol
                      )
                  ) h ON p.symbol = h.symbol
-                 WHERE p.timeframe = '1h'
-                   AND p.profit_loss >= 5
+                 WHERE p.profit_loss >= 5
                    AND p.confidence >= 50
                    AND p.prediction_date = (
-                       SELECT MAX(prediction_date) FROM prediction_performance WHERE timeframe = '1h'
+                       SELECT MAX(prediction_date) FROM prediction_performance
                    )
                  ORDER BY p.confidence DESC, p.profit_loss DESC`
             );
@@ -70,11 +69,10 @@ function startExpressServer() {
                          GROUP BY symbol
                      )
                  ) h ON p.symbol = h.symbol
-                 WHERE p.timeframe = '4h'
-                   AND p.profit_loss >= 5
+                 WHERE p.profit_loss >= 5
                    AND p.confidence >= 50
                    AND p.prediction_date = (
-                       SELECT MAX(prediction_date) FROM prediction_performance WHERE timeframe = '4h'
+                       SELECT MAX(prediction_date) FROM prediction_performance
                    )
                  ORDER BY p.confidence DESC, p.profit_loss DESC`
             );
@@ -82,6 +80,8 @@ function startExpressServer() {
             const uptrendCoins = await fetchUptrendCoins();
             const highConfidenceCoins = await fetchHighConfidenceCoins();
             const highProfitCoins = await fetchHighProfitCoins();
+            const topProfitCoins = await fetchTopProfitCoins();
+            const topConfidenceCoins = await fetchTopConfidenceCoins();
 
             const lastUpdate = new Date().toLocaleString('tr-TR', {
                 year: 'numeric',
@@ -98,6 +98,8 @@ function startExpressServer() {
                 uptrendCoins,
                 highConfidenceCoins,
                 highProfitCoins,
+                topProfitCoins,
+                topConfidenceCoins,
                 lastUpdate
             });
         } catch (error) {
@@ -108,6 +110,8 @@ function startExpressServer() {
                 uptrendCoins: [],
                 highConfidenceCoins: [],
                 highProfitCoins: [],
+                topProfitCoins: [],
+                topConfidenceCoins: [],
                 lastUpdate: new Date().toLocaleString('tr-TR')
             });
         }
