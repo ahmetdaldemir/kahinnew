@@ -299,9 +299,7 @@ function normalizeData(data) {
 }
 
 // Train ML model
-async function trainModel(features, labels) {
-    console.log('Training ML model...');
-    
+async function trainModel(features, labels) {    
     const model = tf.sequential();
     
     // Daha derin bir model oluştur
@@ -349,11 +347,9 @@ async function trainModel(features, labels) {
         shuffle: true,
         callbacks: {
             onEpochEnd: (epoch, logs) => {
-                console.log(`Epoch ${epoch + 1} / 100`);
-                console.log(`  Loss: ${logs.loss.toFixed(4)}`);
-                console.log(`  Accuracy: ${logs.acc.toFixed(4)}`);
-                console.log(`  Validation Loss: ${logs.val_loss.toFixed(4)}`);
-                console.log(`  Validation Accuracy: ${logs.val_acc.toFixed(4)}`);
+                if ((epoch + 1) % 10 === 0 || epoch === 99) {
+                    console.log(`Epoch ${epoch + 1} / 100`);
+                }
             },
             earlyStopping
         }
@@ -365,7 +361,6 @@ async function trainModel(features, labels) {
 // Generate predictions
 async function generatePredictions(symbol) {
     try {
-        console.log(`\nGenerating predictions for ${symbol}...`);
         const data = await fetchData(symbol);
         
         if (data.length === 0) {
@@ -490,6 +485,7 @@ async function main() {
                      ON DUPLICATE KEY UPDATE confidence=VALUES(confidence), last_update=NOW()`,
                     [symbol, confidence]
                 );
+                console.log('Takip listesi güncellendi:', symbol, confidence);
             } catch (e) {
                 console.error('Takip listesi güncellenirken hata:', symbol, e.message);
             }

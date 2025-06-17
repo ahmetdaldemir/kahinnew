@@ -346,12 +346,13 @@
     
 
         socket.on('binanceUptrend', function(data) {
+            console.log('binanceUptrend:', data);
             const tbody = document.querySelector('#uptrendCoinsBody');
             tbody.innerHTML = '';
             data.forEach(function(coin) {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${coin.symbol}</td>
+                    <td onclick="showChartModal('${coin.symbol}')">${coin.symbol}</td>
                     <td>${coin.price}</td>
                     <td>${coin.change24h.toFixed(2)}%</td>
                     <td>${coin.volume}</td>
