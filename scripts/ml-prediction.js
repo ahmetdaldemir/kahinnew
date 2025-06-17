@@ -1,6 +1,12 @@
 require('dotenv').config();
 const tf = require('@tensorflow/tfjs-node');
-const { query } = require('../db');
+
+if (process.env.NODE_ENV === 'production') {
+    const { query } = require('../db');
+} else {
+    const { query } = require('../dev-db');
+}
+
 const moment = require('moment');
 const ti = require('technicalindicators');
 

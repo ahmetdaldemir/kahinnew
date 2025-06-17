@@ -34,4 +34,4 @@ crypto-data.db
 data/
 
 .env
-db.js
+dev-db.js

@@ -1,6 +1,11 @@
 const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const { query } = require('../db');
+const path = require('path');   
+
+if (process.env.NODE_ENV === 'production') {
+    const { query } = require('../db');
+} else {
+    const { query } = require('../dev-db');
+}
 
 const sqliteDbPath = path.join(__dirname, '..', 'data', 'crypto_analyzer.db');
 console.log('SQLite veritabanı yolu:', sqliteDbPath);

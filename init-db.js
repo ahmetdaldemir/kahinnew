@@ -1,5 +1,11 @@
 require('dotenv').config();
-const { query } = require('./db');
+let query;
+
+if (process.env.NODE_ENV === 'production') {
+    query = require('./db').query;
+} else {
+    query = require('./db').query;  // dev-db yerine normal db kullanıyoruz
+}
 
 async function initDatabase() {
     try {
@@ -15,9 +21,10 @@ async function initDatabase() {
                 high DECIMAL(20,8),
                 low DECIMAL(20,8),
                 volume DECIMAL(30,8),
-                timeframe VARCHAR(5) NOT NULL,
+                timeframe VARCHAR(5) NOT NULL DEFAULT '1h',
+                open DECIMAL(20,8),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY unique_data (symbol, timestamp, timeframe)
+                UNIQUE KEY unique_candle (symbol, timestamp, timeframe)
             )
         `);
         console.log('historical_data tablosu oluşturuldu');
