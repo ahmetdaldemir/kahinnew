@@ -26,7 +26,7 @@ async function fetchHighConfidenceCoins() {
     try {
         console.log('Fetching high confidence coins...');
         const rows = await query(`
-            SELECT symbol, confidence, predicted_signal, profit_loss
+            SELECT symbol, confidence, predicted_signal, profit_loss, buy_price, buy_time, sell_price, sell_time
             FROM prediction_performance
             WHERE confidence > 0
             ORDER BY confidence DESC
@@ -97,7 +97,7 @@ async function main() {
 
         // Display high confidence coins
         console.log('\nTop 10 Coins with Highest Confidence:');
-        console.table(highConfidenceCoins);
+        console.table(highConfidenceCoins, ['symbol', 'confidence', 'predicted_signal', 'profit_loss', 'buy_price', 'buy_time', 'sell_price', 'sell_time']);
 
         // Display high profit coins
         console.log('\nTop 10 Coins with Highest Profit:');

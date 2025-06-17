@@ -1,7 +1,5 @@
 require('dotenv').config();
-let query;
-
-const { query } = require('./db');
+const { query } = require('./db'); 
 
 async function initDatabase() {
     try {
@@ -17,10 +15,9 @@ async function initDatabase() {
                 high DECIMAL(20,8),
                 low DECIMAL(20,8),
                 volume DECIMAL(30,8),
-                timeframe VARCHAR(5) NOT NULL DEFAULT '1h',
-                open DECIMAL(20,8),
+                timeframe VARCHAR(5) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY unique_candle (symbol, timestamp, timeframe)
+                UNIQUE KEY unique_data (symbol, timestamp, timeframe)
             )
         `);
         console.log('historical_data tablosu oluşturuldu');
@@ -31,11 +28,15 @@ async function initDatabase() {
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 symbol VARCHAR(20) NOT NULL,
                 prediction_date DATETIME NOT NULL,
-                predicted_signal ENUM('BUY', 'SELL') NOT NULL,
+                predicted_signal ENUM('BUY', 'SELL', 'HOLD') NOT NULL,
                 confidence DECIMAL(5,2) NOT NULL,
                 actual_price DECIMAL(20,8) NOT NULL,
                 predicted_price DECIMAL(20,8) NOT NULL,
                 profit_loss DECIMAL(10,2) NOT NULL,
+                buy_price DECIMAL(20,8),
+                buy_time DATETIME,
+                sell_price DECIMAL(20,8),
+                sell_time DATETIME,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY unique_prediction (symbol, prediction_date)
             )

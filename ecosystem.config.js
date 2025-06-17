@@ -23,6 +23,12 @@ module.exports = {
       autorestart: false
     },
     {
+      name: 'fetch-historical-4h',
+      script: 'scripts/fetch-historical-data.js',
+      cron_restart: '0 */4 * * *', // Her 4 saatte bir otomatik başlat
+      autorestart: false
+    },
+    {
       name: 'fetch-realtime',
       script: 'scripts/fetch-realtime-data.js',
       cron_restart: '*/5 * * * *', // Her 5 dakikada bir otomatik başlat

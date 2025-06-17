@@ -28,15 +28,27 @@ async function initDatabase() {
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 symbol VARCHAR(20) NOT NULL,
                 prediction_date DATETIME NOT NULL,
-                predicted_signal ENUM('BUY', 'SELL') NOT NULL,
+                predicted_signal ENUM('BUY', 'SELL', 'HOLD') NOT NULL,
                 confidence DECIMAL(5,2) NOT NULL,
                 actual_price DECIMAL(20,8) NOT NULL,
                 predicted_price DECIMAL(20,8) NOT NULL,
                 profit_loss DECIMAL(10,2) NOT NULL,
+                buy_price DECIMAL(20,8),
+                buy_time DATETIME,
+                sell_price DECIMAL(20,8),
+                sell_time DATETIME,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY unique_prediction (symbol, prediction_date)
             )
         `);
+        // Tabloya yeni alanlar ekli mi kontrol et, eksikse ALTER ile ekle
+        const columns = await query(`SHOW COLUMNS FROM prediction_performance`);
+        const colNames = columns.map(col => col.Field);
+        if (!colNames.includes('buy_price')) await query(`ALTER TABLE prediction_performance ADD COLUMN buy_price DECIMAL(20,8)`);
+        if (!colNames.includes('buy_time')) await query(`ALTER TABLE prediction_performance ADD COLUMN buy_time DATETIME`);
+        if (!colNames.includes('sell_price')) await query(`ALTER TABLE prediction_performance ADD COLUMN sell_price DECIMAL(20,8)`);
+        if (!colNames.includes('sell_time')) await query(`ALTER TABLE prediction_performance ADD COLUMN sell_time DATETIME`);
+        if (!colNames.includes('predicted_signal')) await query(`ALTER TABLE prediction_performance ADD COLUMN predicted_signal ENUM('BUY', 'SELL', 'HOLD') NOT NULL DEFAULT 'HOLD'`);
         console.log('prediction_performance tablosu oluşturuldu');
 
         // coin_pairs tablosu

@@ -350,18 +350,41 @@ function prepareData(data) {
         ];
     });
 
-    // Normalize features
-    const normalizedFeatures = features.map(feature => normalizeData(feature));
+    // Normalize features (her feature için tüm veri seti üzerinden)
+    function normalizeFeaturesMatrix(matrix) {
+        const featureCount = matrix[0].length;
+        const mins = Array(featureCount).fill(Infinity);
+        const maxs = Array(featureCount).fill(-Infinity);
+        // Min/max bul
+        matrix.forEach(row => {
+            row.forEach((val, i) => {
+                if (val < mins[i]) mins[i] = val;
+                if (val > maxs[i]) maxs[i] = val;
+            });
+        });
+        // Normalize et
+        return matrix.map(row => row.map((val, i) => {
+            if (mins[i] === maxs[i]) return 0.5;
+            return (val - mins[i]) / (maxs[i] - mins[i]);
+        }));
+    }
+
+    const normalizedFeatures = normalizeFeaturesMatrix(features);
 
     // NaN'ları 0 ile değiştir
     const safeFeatures = normalizedFeatures.map(f => f.map(x => isNaN(x) ? 0 : x));
 
     // Create labels based on future price movement
+    const labelLookahead = 5; // Kaç mum sonrası bakılacak
+    const labelThreshold = 0.01; // %1 değişim eşiği
     const labels = data.map((row, index) => {
-        if (index >= data.length - 1) return 0;
+        if (index >= data.length - labelLookahead) return 0.5; // Sonlarda HOLD
         const currentPrice = parseFloat(row.price);
-        const futurePrice = parseFloat(data[index + 1].price);
-        return futurePrice > currentPrice ? 1 : 0;
+        const futurePrice = parseFloat(data[index + labelLookahead].price);
+        const pctChange = (futurePrice - currentPrice) / currentPrice;
+        if (pctChange > labelThreshold) return 1; // BUY
+        if (pctChange < -labelThreshold) return 0; // SELL
+        return 0.5; // HOLD
     });
 
     // Feature ve label NaN kontrolü
@@ -378,17 +401,6 @@ function prepareData(data) {
 
     console.log(`Prepared ${safeFeatures.length} samples for training`);
     return { features: safeFeatures, labels };
-}
-
-// Normalize data
-function normalizeData(data) {
-    const min = Math.min(...data);
-    const max = Math.max(...data);
-    if (min === max) {
-        // Tüm değerler aynıysa, hepsini 0.5 yap
-        return data.map(() => 0.5);
-    }
-    return data.map(x => (x - min) / (max - min));
 }
 
 // Create and compile model
@@ -459,6 +471,35 @@ async function trainModel(features, labels) {
     return model;
 }
 
+// En iyi al/sat noktalarını bul
+function findBestTrade(data) {
+    let minPrice = parseFloat(data[0].price);
+    let minIndex = 0;
+    let maxProfit = 0;
+    let buyIndex = 0;
+    let sellIndex = 0;
+    for (let i = 1; i < data.length; i++) {
+        const price = parseFloat(data[i].price);
+        if (price < minPrice) {
+            minPrice = price;
+            minIndex = i;
+        }
+        const profit = price - minPrice;
+        if (profit > maxProfit) {
+            maxProfit = profit;
+            buyIndex = minIndex;
+            sellIndex = i;
+        }
+    }
+    return {
+        buyPrice: parseFloat(data[buyIndex].price),
+        buyTime: data[buyIndex].timestamp,
+        sellPrice: parseFloat(data[sellIndex].price),
+        sellTime: data[sellIndex].timestamp,
+        profit: maxProfit
+    };
+}
+
 // Generate predictions
 async function generatePredictions(symbol) {
     try {
@@ -470,22 +511,40 @@ async function generatePredictions(symbol) {
         }
 
         const { features, labels } = prepareData(data);
+        if (features.length < 30) {
+            console.warn(`Yetersiz veri: ${symbol} için sadece ${features.length} örnek var, atlanıyor.`);
+            return null;
+        }
+        // En iyi trade noktalarını bul
+        const bestTrade = findBestTrade(data);
+        // Etiket dağılımı logu
+        const labelCounts = labels.reduce((acc, l) => { acc[l] = (acc[l] || 0) + 1; return acc; }, {});
+        console.log('Etiket dağılımı:', labelCounts);
         const model = await trainModel(features, labels);
 
         const lastFeature = features[features.length - 1];
         const prediction = model.predict(tf.tensor2d([lastFeature]));
         const confidence = prediction.dataSync()[0];
+        console.log('Model confidence (raw output):', confidence);
+
+        let signal = 'SELL';
+        if (confidence > 0.55) signal = 'BUY';
+        else if (confidence >= 0.45 && confidence <= 0.55) signal = 'HOLD';
 
         const result = {
             symbol,
-            signal: confidence > 0.5 ? 'BUY' : 'SELL',
+            signal,
             confidence: (confidence * 100).toFixed(2),
             profit: calculateProfit(data).toFixed(2),
             currentPrice: parseFloat(data[data.length - 1].price).toFixed(2),
             predictedPrice: parseFloat(data[data.length - 1].price).toFixed(2),
             priceChange24h: calculatePriceChange(data, 24).toFixed(2),
             volume24h: calculateVolume24h(data).toFixed(2),
-            lastTimestamp: data[data.length - 1].timestamp
+            lastTimestamp: data[data.length - 1].timestamp,
+            buyPrice: bestTrade.buyPrice,
+            buyTime: bestTrade.buyTime,
+            sellPrice: bestTrade.sellPrice,
+            sellTime: bestTrade.sellTime
         };
 
         return result;
@@ -548,9 +607,9 @@ async function main() {
                     }
                     try {
                         const predictionDate = moment(result.lastTimestamp).format('YYYY-MM-DD HH:mm:ss');
-                        const sql = `INSERT INTO prediction_performance (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss)
-                             VALUES (?, ?, ?, ?, ?, ?, ?)
-                             ON DUPLICATE KEY UPDATE predicted_signal=VALUES(predicted_signal), confidence=VALUES(confidence), actual_price=VALUES(actual_price), predicted_price=VALUES(predicted_price), profit_loss=VALUES(profit_loss)`;
+                        const sql = `INSERT INTO prediction_performance (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss, buy_price, buy_time, sell_price, sell_time)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             ON DUPLICATE KEY UPDATE predicted_signal=VALUES(predicted_signal), confidence=VALUES(confidence), actual_price=VALUES(actual_price), predicted_price=VALUES(predicted_price), profit_loss=VALUES(profit_loss), buy_price=VALUES(buy_price), buy_time=VALUES(buy_time), sell_price=VALUES(sell_price), sell_time=VALUES(sell_time)`;
                         const params = [
                             result.symbol,
                             predictionDate,
@@ -558,7 +617,11 @@ async function main() {
                             result.confidence,
                             result.currentPrice,
                             result.predictedPrice,
-                            result.profit
+                            result.profit,
+                            result.buyPrice,
+                            result.buyTime,
+                            result.sellPrice,
+                            result.sellTime
                         ];
                
                         await query(sql, params);
