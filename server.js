@@ -55,7 +55,7 @@ function startExpressServer() {
             const uptrend = data
                 .filter(t => t.symbol.endsWith('USDT'))
                 .sort((a, b) => parseFloat(b.priceChangePercent) - parseFloat(a.priceChangePercent))
-                .slice(0, 10)
+                .slice(0, 20)
                 .map(t => ({
                     symbol: t.symbol,
                     price: t.lastPrice,
