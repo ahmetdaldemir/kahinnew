@@ -1,10 +1,9 @@
 require('dotenv').config();
-let query;
 
 if (process.env.NODE_ENV === 'production') {
-    query = require('../db').query;
+    const { query } = require('../db');
 } else {
-    query = require('../db').query;  // dev-db yerine normal db kullanıyoruz
+    const { query } = require('../dev-db');
 }
 
 // Fetch top 10 coins in downtrend
