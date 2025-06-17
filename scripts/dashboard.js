@@ -88,8 +88,7 @@ async function main() {
         const downtrendCoins = await fetchDowntrendCoins();
         const highConfidenceCoins = await fetchHighConfidenceCoins();
         const highProfitCoins = await fetchHighProfitCoins();
-
-     
+        const topProfitCoins = await fetchTopProfitCoins();
 
         // Display downtrend coins
         console.log('\nTop 10 Coins in Downtrend:');
@@ -102,6 +101,15 @@ async function main() {
         // Display high profit coins
         console.log('\nTop 10 Coins with Highest Profit:');
         console.table(highProfitCoins);
+
+        // Display %5+ profit coins with buy/sell info
+        console.log('\n%5+ Kar Potansiyelli İlk 10 Coin:');
+        console.table(topProfitCoins, ['symbol', 'profit_loss', 'confidence', 'predicted_signal', 'buy_price', 'buy_time', 'sell_price', 'sell_time']);
+
+        // Pozitif kar oranlı tüm coinler
+        const allPositiveProfit = await query(`SELECT * FROM prediction_performance WHERE profit_loss > 0 ORDER BY profit_loss DESC`);
+        console.log('\nTüm Pozitif Kar Oranlı Coinler:');
+        console.table(allPositiveProfit, ['symbol', 'profit_loss', 'confidence', 'predicted_signal', 'buy_price', 'buy_time', 'sell_price', 'sell_time']);
 
     } catch (error) {
         console.error('Error generating dashboard:', error);
