@@ -1,11 +1,17 @@
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 
+if (process.env.NODE_ENV === 'production') {
+    database = 'kahin';
+} else {
+    database = 'kahin_dev';
+}
+
 const pool = mysql.createPool({
     host: '185.209.228.189',
     user: 'root',
     password: 'StrongPassword123!',
-    database: 'kahin',
+    database: database,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,

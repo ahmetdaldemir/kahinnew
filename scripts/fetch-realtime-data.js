@@ -1,15 +1,8 @@
 require('dotenv').config();
 const ccxt = require('ccxt');
 
-let query;
+const { query } = require('../db'); 
 
-if (process.env.NODE_ENV === 'production') {
-    const db = require('../db');
-    query = db.query;
-} else {
-    const devDb = require('../dev-db');
-    query = devDb.query;
-}
 
 // Binance API
 const binance = new ccxt.binance({

@@ -1,14 +1,5 @@
 require('dotenv').config();
-
-let query;
-
-if (process.env.NODE_ENV === 'production') {
-    const db = require('../db');
-    query = db.query;
-} else {
-    const devDb = require('../dev-db');
-    query = devDb.query;
-}
+const { query } = require('../db'); 
 
 async function initDatabase() {
     try {
