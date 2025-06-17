@@ -172,7 +172,7 @@
                                 </thead>
                                 <tbody>
                                     <% topConfidenceCoins.forEach(coin => { %>
-                                        <tr>
+                                        <tr style="cursor:pointer" onclick="showChartModal('<%= coin.symbol %>')">
                                             <td><strong><%= coin.symbol %></strong></td>
                                             <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 50 ? 'confidence-medium' : 'confidence-low' %>">
                                                 <%= parseFloat(coin.confidence).toFixed(2) %>%
@@ -330,7 +330,7 @@
                         tbody.innerHTML = '';
                         json.data.forEach(coin => {
                             tbody.innerHTML += `
-                                <tr>
+                                <tr style="cursor:pointer" onclick="showChartModal('${coin.symbol}')">
                                     <td><strong>${coin.symbol}</strong></td>
                                     <td class="trend-up">${parseFloat(coin.profit_loss).toFixed(2)}%</td>
                                     <td class="${coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 50 ? 'confidence-medium' : 'confidence-low'}">${parseFloat(coin.confidence).toFixed(2)}%</td>
