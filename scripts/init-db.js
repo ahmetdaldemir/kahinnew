@@ -1,9 +1,13 @@
 require('dotenv').config();
 
+let query;
+
 if (process.env.NODE_ENV === 'production') {
-    const { query } = require('../db');
+    const db = require('../db');
+    query = db.query;
 } else {
-    const { query } = require('../dev-db');
+    const devDb = require('../dev-db');
+    query = devDb.query;
 }
 
 async function initDatabase() {
