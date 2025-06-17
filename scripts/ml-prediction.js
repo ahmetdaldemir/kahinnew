@@ -579,7 +579,7 @@ async function main() {
         console.log('Starting ML prediction process...');
         
         // Get all available symbols from coin_pairs table
-        const pairs = await query('SELECT symbol FROM coin_pairs');
+        const pairs = await query('SELECT symbol FROM coin_pairs order by id asc');
         console.log(`Found ${pairs.length} symbols to analyze`);
         const skippedCoins = [];
         const watchedCoins = [];
