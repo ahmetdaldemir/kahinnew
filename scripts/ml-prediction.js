@@ -168,6 +168,90 @@ function calculateMFI(high, low, close, volume, period = 14) {
     return isNaN(mfi) ? 50 : mfi;
 }
 
+// VWAP hesaplama fonksiyonu
+function calculateVWAP(high, low, close, volume, period = 14) {
+    if (high.length < period || low.length < period || close.length < period || volume.length < period) {
+        return close[close.length - 1];
+    }
+
+    const typicalPrices = close.map((c, i) => (high[i] + low[i] + c) / 3);
+    const volumePrice = typicalPrices.map((tp, i) => tp * volume[i]);
+    
+    const sumVolumePrice = volumePrice.slice(-period).reduce((a, b) => a + b, 0);
+    const sumVolume = volume.slice(-period).reduce((a, b) => a + b, 0);
+    
+    const vwap = sumVolumePrice / sumVolume;
+    return isNaN(vwap) ? close[close.length - 1] : vwap;
+}
+
+// Hacim Profili hesaplama fonksiyonu
+function calculateVolumeProfile(high, low, close, volume, numBins = 10) {
+    if (high.length < 2 || low.length < 2 || close.length < 2 || volume.length < 2) {
+        return {
+            poc: close[close.length - 1],
+            valueAreaHigh: high[high.length - 1],
+            valueAreaLow: low[low.length - 1]
+        };
+    }
+
+    // Fiyat aralığını belirle
+    const priceRange = Math.max(...high) - Math.min(...low);
+    const binSize = priceRange / numBins;
+    
+    // Her bir fiyat seviyesi için hacim toplamı
+    const volumeProfile = new Array(numBins).fill(0);
+    const priceLevels = new Array(numBins).fill(0);
+    
+    for (let i = 0; i < numBins; i++) {
+        priceLevels[i] = Math.min(...low) + (i * binSize);
+    }
+    
+    // Her mum için hacim dağılımı
+    for (let i = 0; i < close.length; i++) {
+        const price = close[i];
+        const vol = volume[i];
+        const binIndex = Math.min(Math.floor((price - Math.min(...low)) / binSize), numBins - 1);
+        volumeProfile[binIndex] += vol;
+    }
+    
+    // Point of Control (POC) - En yüksek hacimli seviye
+    const maxVolumeIndex = volumeProfile.indexOf(Math.max(...volumeProfile));
+    const poc = priceLevels[maxVolumeIndex];
+    
+    // Value Area (VA) - Toplam hacmin %70'ini içeren alan
+    const totalVolume = volumeProfile.reduce((a, b) => a + b, 0);
+    const targetVolume = totalVolume * 0.7;
+    
+    let currentVolume = 0;
+    let vaHigh = poc;
+    let vaLow = poc;
+    
+    // POC'den yukarı ve aşağı doğru genişleme
+    let upIndex = maxVolumeIndex;
+    let downIndex = maxVolumeIndex;
+    
+    while (currentVolume < targetVolume && (upIndex < numBins - 1 || downIndex > 0)) {
+        const upVolume = upIndex < numBins - 1 ? volumeProfile[upIndex + 1] : 0;
+        const downVolume = downIndex > 0 ? volumeProfile[downIndex - 1] : 0;
+        
+        if (upVolume > downVolume && upIndex < numBins - 1) {
+            currentVolume += upVolume;
+            vaHigh = priceLevels[++upIndex];
+        } else if (downIndex > 0) {
+            currentVolume += downVolume;
+            vaLow = priceLevels[--downIndex];
+        } else {
+            break;
+        }
+    }
+    
+    return {
+        poc: isNaN(poc) ? close[close.length - 1] : poc,
+        valueAreaHigh: isNaN(vaHigh) ? high[high.length - 1] : vaHigh,
+        valueAreaLow: isNaN(vaLow) ? low[low.length - 1] : vaLow
+    };
+}
+
 // Fetch data from database
 async function fetchData(symbol) {
     const rows = await query(
@@ -210,6 +294,10 @@ function prepareData(data) {
         const rsi = calculateRSI(prices.slice(0, index + 1));
         const { macd, signal, histogram } = calculateMACD(prices.slice(0, index + 1));
         const { upper, middle, lower } = calculateBollingerBands(prices.slice(0, index + 1));
+        
+        // VWAP ve Hacim Profili hesaplamaları
+        const vwap = calculateVWAP(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1), volumes.slice(0, index + 1));
+        const { poc, valueAreaHigh, valueAreaLow } = calculateVolumeProfile(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1), volumes.slice(0, index + 1));
         
         // Additional technical indicators
         const ema = calculateEMA(prices.slice(0, index + 1));
@@ -254,7 +342,11 @@ function prepareData(data) {
             ichimoku.base,
             ichimoku.spanA,
             ichimoku.spanB,
-            mfi
+            mfi,
+            vwap,           // Yeni: VWAP
+            poc,            // Yeni: Point of Control
+            valueAreaHigh,  // Yeni: Value Area High
+            valueAreaLow    // Yeni: Value Area Low
         ];
     });
 
@@ -299,31 +391,32 @@ function normalizeData(data) {
     return data.map(x => (x - min) / (max - min));
 }
 
-// Train ML model
-async function trainModel(features, labels) {    
+// Create and compile model
+function createModel(inputShape) {
     const model = tf.sequential();
     
-    // Daha derin bir model oluştur
+    // Input layer
+    model.add(tf.layers.dense({
+        units: 128,
+        activation: 'relu',
+        inputShape: [inputShape]
+    }));
+    model.add(tf.layers.dropout(0.3));
+    
+    // Hidden layers
     model.add(tf.layers.dense({
         units: 64,
-        activation: 'relu',
-        inputShape: [features[0].length]
+        activation: 'relu'
     }));
-    
     model.add(tf.layers.dropout(0.2));
     
     model.add(tf.layers.dense({
         units: 32,
         activation: 'relu'
     }));
+    model.add(tf.layers.dropout(0.1));
     
-    model.add(tf.layers.dropout(0.2));
-    
-    model.add(tf.layers.dense({
-        units: 16,
-        activation: 'relu'
-    }));
-    
+    // Output layer
     model.add(tf.layers.dense({
         units: 1,
         activation: 'sigmoid'
@@ -334,6 +427,13 @@ async function trainModel(features, labels) {
         loss: 'binaryCrossentropy',
         metrics: ['accuracy']
     });
+    
+    return model;
+}
+
+// Train ML model
+async function trainModel(features, labels) {    
+    const model = createModel(features[0].length);
     
     // Daha uzun eğitim
     const earlyStopping = tf.callbacks.earlyStopping({
