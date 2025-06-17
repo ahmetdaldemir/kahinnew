@@ -2,12 +2,15 @@ const express = require('express');
 const path = require('path');
 const { spawn, execSync, exec } = require('child_process');
 
-if (process.env.NODE_ENV === 'production') {
-    const { query } = require('./db');
-} else {
-    const { query } = require('./dev-db');
-}
+let query;
 
+if (process.env.NODE_ENV === 'production') {
+    const db = require('../db');
+    query = db.query;
+} else {
+    const devDb = require('../dev-db');
+    query = devDb.query;
+}
 const {  fetchHighConfidenceCoins, fetchHighProfitCoins, fetchTopProfitCoins, fetchTopConfidenceCoins } = require('./scripts/dashboard');
 const http = require('http');
 const socketIo = require('socket.io');
