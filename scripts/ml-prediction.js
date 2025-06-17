@@ -337,6 +337,11 @@ async function trainModel(features, labels) {
     });
     
     // Daha uzun eğitim
+    const earlyStopping = tf.callbacks.earlyStopping({
+        monitor: 'val_loss',
+        patience: 10,
+        verbose: 1
+    });
     await model.fit(tf.tensor2d(features), tf.tensor1d(labels), {
         epochs: 100,
         batchSize: 32,
@@ -349,7 +354,8 @@ async function trainModel(features, labels) {
                 console.log(`  Accuracy: ${logs.acc.toFixed(4)}`);
                 console.log(`  Validation Loss: ${logs.val_loss.toFixed(4)}`);
                 console.log(`  Validation Accuracy: ${logs.val_acc.toFixed(4)}`);
-            }
+            },
+            earlyStopping
         }
     });
     
