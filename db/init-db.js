@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { query } = require('../db/db'); 
+const { query } = require('./db'); 
 
 async function initDatabase() {
     try {
@@ -38,7 +38,10 @@ async function initDatabase() {
                 sell_price DECIMAL(20,8),
                 sell_time DATETIME,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY unique_prediction (symbol, prediction_date)
+                UNIQUE KEY unique_prediction (symbol, prediction_date),
+                support_levels TEXT,
+                resistance_levels TEXT,
+                dynamic_levels TEXT
             )
         `);
         console.log('prediction_performance tablosu oluşturuldu');
@@ -64,6 +67,21 @@ async function initDatabase() {
             )
         `);
         console.log('watch_list tablosu oluşturuldu');
+
+        // Destek ve Direnç Seviyeleri Tablosu
+        await query(`
+            CREATE TABLE IF NOT EXISTS support_resistance_levels (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                symbol VARCHAR(20) NOT NULL,
+                level_type ENUM('support', 'resistance') NOT NULL,
+                price DECIMAL(20,8) NOT NULL,
+                strength INT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                is_dynamic BOOLEAN DEFAULT FALSE,
+                FOREIGN KEY (symbol) REFERENCES watch_list(symbol)
+            )
+        `);
+        console.log('support_resistance_levels tablosu oluşturuldu');
 
         console.log('Tüm tablolar başarıyla oluşturuldu!');
         process.exit(0);
