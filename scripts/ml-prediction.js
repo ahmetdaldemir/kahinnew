@@ -349,6 +349,27 @@ function calculateStandardDeviation(prices, period) {
     return Math.sqrt(variance);
 }
 
+// Normalize features matrix
+function normalizeFeaturesMatrix(matrix) {
+    const featureCount = matrix[0].length;
+    const mins = Array(featureCount).fill(Infinity);
+    const maxs = Array(featureCount).fill(-Infinity);
+    
+    // Min/max bul
+    matrix.forEach(row => {
+        row.forEach((val, i) => {
+            if (val < mins[i]) mins[i] = val;
+            if (val > maxs[i]) maxs[i] = val;
+        });
+    });
+    
+    // Normalize et
+    return matrix.map(row => row.map((val, i) => {
+        if (mins[i] === maxs[i]) return 0.5;
+        return (val - mins[i]) / (maxs[i] - mins[i]);
+    }));
+}
+
 // Fetch data from database
 async function fetchData(symbol) {
     const rows = await query(
@@ -369,47 +390,46 @@ function prepareData(data) {
 
     console.log('Preparing data for ML model...');
     
-    // Calculate additional features
-    const prices = data.map(row => parseFloat(row.price));
-    const volumes = data.map(row => parseFloat(row.volume));
-    const highs = data.map(row => parseFloat(row.high || row.price));
-    const lows = data.map(row => parseFloat(row.low || row.price));
+    // Veri setini optimize et - son 100 mum yeterli
+    const optimizedData = data.slice(-100);
     
-    const features = data.map((row, index) => {
+    // Calculate additional features
+    const prices = optimizedData.map(row => parseFloat(row.price));
+    const volumes = optimizedData.map(row => parseFloat(row.volume));
+    const highs = optimizedData.map(row => parseFloat(row.high || row.price));
+    const lows = optimizedData.map(row => parseFloat(row.low || row.price));
+    
+    // Önceden hesaplanmış göstergeleri sakla
+    const preCalculatedIndicators = {
+        rsi: calculateRSI(prices),
+        macd: calculateMACD(prices),
+        bb: calculateBollingerBands(prices),
+        ema: calculateEMA(prices),
+        sma: calculateSMA(prices),
+        stoch: calculateStochastic(highs, lows, prices),
+        adx: calculateADX(highs, lows, prices),
+        cci: calculateCCI(highs, lows, prices),
+        willr: calculateWilliamsR(highs, lows, prices),
+        psar: calculateParabolicSAR(highs, lows),
+        atr: calculateATR(highs, lows, prices),
+        obv: calculateOBV(prices, volumes),
+        ichimoku: calculateIchimokuCloud(highs, lows, prices),
+        mfi: calculateMFI(highs, lows, prices, volumes),
+        vwap: calculateVWAP(highs, lows, prices, volumes),
+        volumeProfile: calculateVolumeProfile(highs, lows, prices, volumes)
+    };
+    
+    const features = optimizedData.map((row, index) => {
         const price = parseFloat(row.price);
         const volume = parseFloat(row.volume);
         
         // Price momentum
-        const priceChange = index > 0 ? price - parseFloat(data[index - 1].price) : 0;
-        const priceChangePercent = index > 0 ? (priceChange / parseFloat(data[index - 1].price)) * 100 : 0;
+        const priceChange = index > 0 ? price - parseFloat(optimizedData[index - 1].price) : 0;
+        const priceChangePercent = index > 0 ? (priceChange / parseFloat(optimizedData[index - 1].price)) * 100 : 0;
         
         // Volume momentum
-        const volumeChange = index > 0 ? volume - parseFloat(data[index - 1].volume) : 0;
-        const volumeChangePercent = index > 0 ? (volumeChange / parseFloat(data[index - 1].volume)) * 100 : 0;
-        
-        // Technical indicators
-        const rsi = calculateRSI(prices.slice(0, index + 1));
-        const { macd, signal, histogram } = calculateMACD(prices.slice(0, index + 1));
-        const { upper, middle, lower } = calculateBollingerBands(prices.slice(0, index + 1));
-        
-        // VWAP ve Hacim Profili hesaplamaları
-        const vwap = calculateVWAP(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1), volumes.slice(0, index + 1));
-        const { poc, valueAreaHigh, valueAreaLow } = calculateVolumeProfile(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1), volumes.slice(0, index + 1));
-        
-        // Additional technical indicators
-        const ema = calculateEMA(prices.slice(0, index + 1));
-        const sma = calculateSMA(prices.slice(0, index + 1));
-        const stoch = calculateStochastic(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
-        const adx = calculateADX(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
-        const cci = calculateCCI(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
-        const willr = calculateWilliamsR(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
-        const psar = calculateParabolicSAR(highs.slice(0, index + 1), lows.slice(0, index + 1));
-        const atr = calculateATR(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
-        const obv = calculateOBV(prices.slice(0, index + 1), volumes.slice(0, index + 1));
-        
-        // Yeni teknik göstergeler
-        const ichimoku = calculateIchimokuCloud(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1));
-        const mfi = calculateMFI(highs.slice(0, index + 1), lows.slice(0, index + 1), prices.slice(0, index + 1), volumes.slice(0, index + 1));
+        const volumeChange = index > 0 ? volume - parseFloat(optimizedData[index - 1].volume) : 0;
+        const volumeChangePercent = index > 0 ? (volumeChange / parseFloat(optimizedData[index - 1].volume)) * 100 : 0;
         
         return [
             price,
@@ -418,86 +438,53 @@ function prepareData(data) {
             priceChangePercent,
             volumeChange,
             volumeChangePercent,
-            rsi,
-            macd,
-            signal,
-            histogram,
-            upper,
-            middle,
-            lower,
-            ema,
-            sma,
-            stoch.k,
-            stoch.d,
-            adx,
-            cci,
-            willr,
-            psar,
-            atr,
-            obv,
-            ichimoku.conversion,
-            ichimoku.base,
-            ichimoku.spanA,
-            ichimoku.spanB,
-            mfi,
-            vwap,           // Yeni: VWAP
-            poc,            // Yeni: Point of Control
-            valueAreaHigh,  // Yeni: Value Area High
-            valueAreaLow    // Yeni: Value Area Low
+            preCalculatedIndicators.rsi[index] || 50,
+            preCalculatedIndicators.macd.macd[index] || 0,
+            preCalculatedIndicators.macd.signal[index] || 0,
+            preCalculatedIndicators.macd.histogram[index] || 0,
+            preCalculatedIndicators.bb.upper[index] || price,
+            preCalculatedIndicators.bb.middle[index] || price,
+            preCalculatedIndicators.bb.lower[index] || price,
+            preCalculatedIndicators.ema[index] || price,
+            preCalculatedIndicators.sma[index] || price,
+            preCalculatedIndicators.stoch.k[index] || 50,
+            preCalculatedIndicators.stoch.d[index] || 50,
+            preCalculatedIndicators.adx[index] || 20,
+            preCalculatedIndicators.cci[index] || 0,
+            preCalculatedIndicators.willr[index] || -50,
+            preCalculatedIndicators.psar[index] || price,
+            preCalculatedIndicators.atr[index] || 0,
+            preCalculatedIndicators.obv[index] || 0,
+            preCalculatedIndicators.ichimoku.conversion[index] || price,
+            preCalculatedIndicators.ichimoku.base[index] || price,
+            preCalculatedIndicators.ichimoku.spanA[index] || price,
+            preCalculatedIndicators.ichimoku.spanB[index] || price,
+            preCalculatedIndicators.mfi[index] || 50,
+            preCalculatedIndicators.vwap[index] || price,
+            preCalculatedIndicators.volumeProfile.poc[index] || price,
+            preCalculatedIndicators.volumeProfile.valueAreaHigh[index] || price,
+            preCalculatedIndicators.volumeProfile.valueAreaLow[index] || price
         ];
     });
 
-    // Normalize features (her feature için tüm veri seti üzerinden)
-    function normalizeFeaturesMatrix(matrix) {
-        const featureCount = matrix[0].length;
-        const mins = Array(featureCount).fill(Infinity);
-        const maxs = Array(featureCount).fill(-Infinity);
-        // Min/max bul
-        matrix.forEach(row => {
-            row.forEach((val, i) => {
-                if (val < mins[i]) mins[i] = val;
-                if (val > maxs[i]) maxs[i] = val;
-            });
-        });
-        // Normalize et
-        return matrix.map(row => row.map((val, i) => {
-            if (mins[i] === maxs[i]) return 0.5;
-            return (val - mins[i]) / (maxs[i] - mins[i]);
-        }));
-    }
-
+    // Normalize features
     const normalizedFeatures = normalizeFeaturesMatrix(features);
-
-    // NaN'ları 0 ile değiştir
-    const safeFeatures = normalizedFeatures.map(f => f.map(x => isNaN(x) ? 0 : x));
-
+    
     // Create labels based on future price movement
-    const labelLookahead = 5; // Kaç mum sonrası bakılacak
-    const labelThreshold = 0.01; // %1 değişim eşiği
-    const labels = data.map((row, index) => {
-        if (index >= data.length - labelLookahead) return 0.5; // Sonlarda HOLD
+    const labelLookahead = 5;
+    const labelThreshold = 0.01;
+    const labels = optimizedData.map((row, index) => {
+        if (index >= optimizedData.length - labelLookahead) return 0.5;
         const currentPrice = parseFloat(row.price);
-        const futurePrice = parseFloat(data[index + labelLookahead].price);
+        const futurePrice = parseFloat(optimizedData[index + labelLookahead].price);
         const pctChange = (futurePrice - currentPrice) / currentPrice;
-        if (pctChange > labelThreshold) return 1; // BUY
-        if (pctChange < -labelThreshold) return 0; // SELL
-        return 0.5; // HOLD
+        if (pctChange > labelThreshold) return 1;
+        if (pctChange < -labelThreshold) return 0;
+        return 0.5;
     });
 
-    // Feature ve label NaN kontrolü
-    safeFeatures.forEach((f, i) => {
-        if (f.some(Number.isNaN)) {
-            console.error('NaN feature:', f, 'index:', i, 'row:', data[i]);
-        }
-    });
-    labels.forEach((l, i) => {
-        if (Number.isNaN(l)) {
-            console.error('NaN label:', l, 'index:', i, 'row:', data[i]);
-        }
-    });
-
-    console.log(`Prepared ${safeFeatures.length} samples for training`);
-    return { features: safeFeatures, labels };
+    console.log(`Prepared ${normalizedFeatures.length} samples for training`);
+    return { features: normalizedFeatures, labels };
 }
 
 // Create and compile model
