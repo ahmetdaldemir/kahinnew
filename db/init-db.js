@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { query } = require('./db'); 
+const { query } = require('../db/db'); 
 
 async function initDatabase() {
     try {

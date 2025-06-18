@@ -1,6 +1,6 @@
 require('dotenv').config();
 const tf = require('@tensorflow/tfjs-node');
-const { query } = require('../db'); 
+const { query } = require('../db/db'); 
 
 const moment = require('moment');
 const ti = require('technicalindicators');
@@ -252,6 +252,103 @@ function calculateVolumeProfile(high, low, close, volume, numBins = 10) {
     };
 }
 
+// Destek ve Direnç Seviyeleri Tespiti
+function findSupportResistanceLevels(high, low, close, volume, lookbackPeriod = 20) {
+    const levels = {
+        support: [],
+        resistance: []
+    };
+
+    // Pivot Noktaları Hesaplama
+    for (let i = 2; i < close.length - 2; i++) {
+        // Direnç Seviyesi
+        if (high[i] > high[i-1] && high[i] > high[i-2] && 
+            high[i] > high[i+1] && high[i] > high[i+2]) {
+            levels.resistance.push({
+                price: high[i],
+                strength: calculateLevelStrength(high[i], close, volume, i),
+                time: i
+            });
+        }
+        
+        // Destek Seviyesi
+        if (low[i] < low[i-1] && low[i] < low[i-2] && 
+            low[i] < low[i+1] && low[i] < low[i+2]) {
+            levels.support.push({
+                price: low[i],
+                strength: calculateLevelStrength(low[i], close, volume, i),
+                time: i
+            });
+        }
+    }
+
+    // Seviyeleri güçlerine göre sırala ve en güçlü olanları seç
+    levels.support.sort((a, b) => b.strength - a.strength);
+    levels.resistance.sort((a, b) => b.strength - a.strength);
+
+    // Son 20 mum için en güçlü 3 destek ve direnç seviyesini döndür
+    return {
+        support: levels.support.slice(0, 3),
+        resistance: levels.resistance.slice(0, 3)
+    };
+}
+
+// Seviye Gücü Hesaplama
+function calculateLevelStrength(price, close, volume, index) {
+    let strength = 0;
+    const lookback = 10;
+    
+    // Fiyatın bu seviyeye yakınlığı
+    for (let i = Math.max(0, index - lookback); i < Math.min(close.length, index + lookback); i++) {
+        const priceDiff = Math.abs(close[i] - price) / price;
+        if (priceDiff < 0.01) { // %1'den az fark
+            strength += 1;
+        }
+    }
+
+    // Hacim analizi
+    const avgVolume = volume.slice(index - lookback, index + lookback).reduce((a, b) => a + b, 0) / (lookback * 2);
+    if (volume[index] > avgVolume * 1.5) {
+        strength += 2;
+    }
+
+    return strength;
+}
+
+// Dinamik Destek/Direnç Seviyeleri
+function calculateDynamicLevels(close, period = 20) {
+    const levels = {
+        support: [],
+        resistance: []
+    };
+
+    // Hareketli Ortalama Tabanlı Seviyeler
+    const sma = calculateSMA(close, period);
+    const stdDev = calculateStandardDeviation(close, period);
+
+    levels.support.push({
+        price: sma - (2 * stdDev),
+        type: 'dynamic',
+        strength: 1
+    });
+
+    levels.resistance.push({
+        price: sma + (2 * stdDev),
+        type: 'dynamic',
+        strength: 1
+    });
+
+    return levels;
+}
+
+// Standart Sapma Hesaplama
+function calculateStandardDeviation(prices, period) {
+    const sma = calculateSMA(prices, period);
+    const squaredDiffs = prices.slice(-period).map(price => Math.pow(price - sma, 2));
+    const variance = squaredDiffs.reduce((a, b) => a + b, 0) / period;
+    return Math.sqrt(variance);
+}
+
 // Fetch data from database
 async function fetchData(symbol) {
     const rows = await query(
@@ -407,11 +504,11 @@ function prepareData(data) {
 function createModel(inputShape) {
     const model = tf.sequential();
     
-    // Input layer
+    // Input layer - inputShape'i düzelt
     model.add(tf.layers.dense({
         units: 128,
         activation: 'relu',
-        inputShape: [inputShape]
+        inputShape: inputShape // inputShape artık bir sayı değil, bir dizi
     }));
     model.add(tf.layers.dropout(0.3));
     
@@ -445,7 +542,7 @@ function createModel(inputShape) {
 
 // Train ML model
 async function trainModel(features, labels) {    
-    const model = createModel(features[0].length);
+    const model = createModel([features[0].length]);
     
     // Daha uzun eğitim
     const earlyStopping = tf.callbacks.earlyStopping({
@@ -504,73 +601,49 @@ function findBestTrade(data) {
 async function generatePredictions(symbol) {
     try {
         const data = await fetchData(symbol);
-        
-        if (data.length === 0) {
-            console.log(`No data available for ${symbol}`);
-            return null;
-        }
+        if (!data || data.length === 0) return null;
 
-        const { features, labels } = prepareData(data);
-        if (features.length < 30) {
-            console.warn(`Yetersiz veri: ${symbol} için sadece ${features.length} örnek var, atlanıyor.`);
-            return null;
-        }
-        // En iyi trade noktalarını bul
-        const bestTrade = findBestTrade(data);
-        // Etiket dağılımı logu
-        const labelCounts = labels.reduce((acc, l) => { acc[l] = (acc[l] || 0) + 1; return acc; }, {});
-        console.log('Etiket dağılımı:', labelCounts);
-        const model = await trainModel(features, labels);
+        const preparedData = prepareData(data);
+        const features = preparedData.features;
+        const labels = preparedData.labels;
 
-        const lastFeature = features[features.length - 1];
-        const prediction = model.predict(tf.tensor2d([lastFeature]));
+        const model = createModel([features[0].length]); // inputShape'i düzgün formatta ver
+        await trainModel(features, labels);
+
+        const lastFeatures = features[features.length - 1];
+        const prediction = model.predict(tf.tensor2d([lastFeatures]));
         const confidence = prediction.dataSync()[0];
-        console.log('Model confidence (raw output):', confidence);
 
-        let signal = 'SELL';
-        if (confidence > 0.55) signal = 'BUY';
-        else if (confidence >= 0.45 && confidence <= 0.55) signal = 'HOLD';
+        // Destek ve Direnç Seviyelerini Hesapla
+        const supportResistance = findSupportResistanceLevels(
+            data.map(d => d.high),
+            data.map(d => d.low),
+            data.map(d => d.close),
+            data.map(d => d.volume)
+        );
 
-        const result = {
+        const dynamicLevels = calculateDynamicLevels(data.map(d => d.close));
+
+        // En iyi alım-satım noktalarını bul
+        const bestTrade = findBestTrade(data);
+
+        return {
             symbol,
-            signal,
-            confidence: (confidence * 100).toFixed(2),
-            profit: calculateProfit(data).toFixed(2),
-            currentPrice: parseFloat(data[data.length - 1].price).toFixed(2),
-            predictedPrice: parseFloat(data[data.length - 1].price).toFixed(2),
-            priceChange24h: calculatePriceChange(data, 24).toFixed(2),
-            volume24h: calculateVolume24h(data).toFixed(2),
-            lastTimestamp: data[data.length - 1].timestamp,
+            confidence,
+            prediction: confidence > 0.5 ? 'YÜKSELIŞ' : 'DÜŞÜŞ',
+            timestamp: new Date(),
+            supportLevels: supportResistance.support,
+            resistanceLevels: supportResistance.resistance,
+            dynamicLevels,
             buyPrice: bestTrade.buyPrice,
             buyTime: bestTrade.buyTime,
             sellPrice: bestTrade.sellPrice,
             sellTime: bestTrade.sellTime
         };
-
-        return result;
     } catch (error) {
-        console.error(`Error generating predictions for ${symbol}:`, error);
+        console.error(`Tahmin hatası (${symbol}):`, error);
         return null;
     }
-}
-
-// Calculate profit
-function calculateProfit(data) {
-    const lastPrice = parseFloat(data[data.length - 1].price);
-    const firstPrice = parseFloat(data[0].price);
-    return ((lastPrice - firstPrice) / firstPrice) * 100;
-}
-
-// Calculate 24h price change
-function calculatePriceChange(data, hours) {
-    const currentPrice = parseFloat(data[data.length - 1].price);
-    const pastPrice = parseFloat(data[Math.max(0, data.length - hours)].price);
-    return ((currentPrice - pastPrice) / pastPrice) * 100;
-}
-
-// Calculate 24h volume
-function calculateVolume24h(data) {
-    return data.slice(-24).reduce((sum, row) => sum + parseFloat(row.volume), 0);
 }
 
 // Main function
@@ -613,7 +686,7 @@ async function main() {
                         const params = [
                             result.symbol,
                             predictionDate,
-                            result.signal,
+                            result.prediction,
                             result.confidence,
                             result.currentPrice,
                             result.predictedPrice,

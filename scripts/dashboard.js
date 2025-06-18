@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { query } = require('../db'); 
+const { query } = require('../db/db'); 
 
 
 // Fetch top 10 coins in downtrend

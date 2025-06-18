@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { spawn, execSync, exec } = require('child_process');
 
-const { query } = require('./db'); 
+const { query } = require('./db/db'); 
 
 const {  fetchHighConfidenceCoins, fetchHighProfitCoins, fetchTopProfitCoins, fetchTopConfidenceCoins } = require('./scripts/dashboard');
 const http = require('http');
@@ -223,7 +223,7 @@ async function autoSetupAndStartServer() {
     try {
         startExpressServer(); // Express hemen başlasın
 
-        runScriptSync('node init-db.js'); // veritabanı senkron başlat
+        runScriptSync('node db/init-db.js'); // veritabanı senkron başlat
 
         const result = await query('SELECT COUNT(*) as cnt FROM historical_data');
         const hasData = result[0].cnt > 0;

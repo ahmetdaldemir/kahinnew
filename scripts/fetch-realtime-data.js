@@ -1,7 +1,7 @@
 require('dotenv').config();
 const ccxt = require('ccxt');
 
-const { query } = require('../db'); 
+const { query } = require('../db/db'); 
 
 
 // Binance API
