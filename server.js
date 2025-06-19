@@ -226,7 +226,7 @@ function startExpressServer() {
     // API: İzleme listesi (watch_list)
     app.get('/api/watch-list', async (req, res) => {
         try {
-            const watchList = await query('SELECT * FROM watch_list ORDER BY confidence DESC');
+            const watchList = await query('SELECT * FROM watch_list where confidence >= 30 and confidence <= 100 ORDER BY confidence DESC LIMIT 20');
             res.json({ success: true, data: watchList });
         } catch (error) {
             res.json({ success: false, error: error.message });
