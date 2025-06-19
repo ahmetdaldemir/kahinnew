@@ -15,23 +15,52 @@ const port = process.env.PORT || 3200;
 // Yardımcı fonksiyon: Scripti senkron çalıştır
 function runScriptSync(command) {
     try {
-        console.log(`Çalıştırılıyor: ${command}`);
+        console.log(`🔄 Çalıştırılıyor: ${command}`);
         execSync(command, { stdio: 'inherit' });
+        console.log(`✅ Tamamlandı: ${command}`);
     } catch (err) {
-        console.error(`Hata: ${command}`, err.message);
+        console.error(`❌ Hata: ${command}`, err.message);
     }
 }
 
 // Yardımcı fonksiyon: Scripti asenkron promise olarak çalıştır
 function runScriptPromise(command) {
     return new Promise((resolve, reject) => {
+        console.log(`🔄 Başlatılıyor: ${command}`);
         const [cmd, ...args] = command.split(' ');
         const proc = spawn(cmd, args, { stdio: 'inherit' });
+        
         proc.on('close', code => {
-            if (code === 0) resolve();
-            else reject(new Error(`${command} exited with code ${code}`));
+            if (code === 0) {
+                console.log(`✅ Tamamlandı: ${command}`);
+                resolve();
+            } else {
+                console.error(`❌ Hata: ${command} exited with code ${code}`);
+                reject(new Error(`${command} exited with code ${code}`));
+            }
+        });
+        
+        proc.on('error', (err) => {
+            console.error(`❌ Process error: ${command}`, err.message);
+            reject(err);
         });
     });
+}
+
+// Sıralı script çalıştırma fonksiyonu
+async function runScriptsSequentially(scripts) {
+    console.log('🚀 Script sırası başlatılıyor...');
+    for (let i = 0; i < scripts.length; i++) {
+        const script = scripts[i];
+        try {
+            console.log(`\n📋 [${i + 1}/${scripts.length}] ${script}`);
+            await runScriptPromise(script);
+        } catch (error) {
+            console.error(`❌ Script hatası: ${script}`, error.message);
+            // Hata durumunda devam et
+        }
+    }
+    console.log('🎉 Tüm scriptler tamamlandı!');
 }
 
 // Express sunucusunu başlat
@@ -45,7 +74,7 @@ function startExpressServer() {
     const io = socketIo(server);
 
     io.on('connection', (socket) => {
-        console.log('Bir istemci bağlandı (WebSocket)');
+        console.log('🌐 Bir istemci bağlandı (WebSocket)');
     });
 
     // Her 15 saniyede bir Binance'tan en çok yükselen 10 coini çekip yayınla
@@ -66,7 +95,7 @@ function startExpressServer() {
                 }));
             io.emit('binanceUptrend', uptrend);
         } catch (e) {
-            console.error('Binance uptrend yayınlanırken hata:', e.message);
+            console.error('❌ Binance uptrend yayınlanırken hata:', e.message);
         }
     }, 15000);
 
@@ -138,7 +167,7 @@ function startExpressServer() {
                 lastUpdate
             });
         } catch (error) {
-            console.error('Ana sayfa yüklenirken hata:', error);
+            console.error('❌ Ana sayfa yüklenirken hata:', error);
             res.render('index', {
                 predictions1h: [],
                 predictions4h: [],
@@ -153,19 +182,44 @@ function startExpressServer() {
     });
 
     app.post('/api/run-predictions', (req, res) => {
+        console.log('🔮 Manuel ML prediction başlatılıyor...');
         const predictionProcess = spawn('node', ['scripts/ml-prediction.js']);
 
         predictionProcess.stdout.on('data', (data) => {
-            console.log(`Prediction output: ${data}`);
+            console.log(`📊 Prediction output: ${data}`);
         });
 
         predictionProcess.stderr.on('data', (data) => {
-            console.error(`Prediction error: ${data}`);
+            console.error(`❌ Prediction error: ${data}`);
         });
 
         predictionProcess.on('close', (code) => {
+            if (code === 0) {
+                console.log('✅ Manuel ML prediction tamamlandı');
+            } else {
+                console.error(`❌ Manuel ML prediction hatası: ${code}`);
+            }
             res.json({ success: code === 0 });
         });
+    });
+
+    // API: Tüm scriptleri sırayla çalıştır
+    app.post('/api/run-all-scripts', async (req, res) => {
+        try {
+            console.log('🚀 Tüm scriptler manuel olarak başlatılıyor...');
+            
+            const scripts = [
+                'node scripts/fetch-historical-data.js',
+                'node scripts/fetch-realtime-data.js',
+                'node scripts/ml-prediction.js'
+            ];
+            
+            await runScriptsSequentially(scripts);
+            res.json({ success: true, message: 'Tüm scriptler tamamlandı' });
+        } catch (error) {
+            console.error('❌ Script çalıştırma hatası:', error);
+            res.json({ success: false, error: error.message });
+        }
     });
 
     // API: İzleme listesi (watch_list)
@@ -198,47 +252,182 @@ function startExpressServer() {
         }
     });
 
+    // API: Sistem durumu
+    app.get('/api/system-status', (req, res) => {
+        try {
+            const status = autoSystem.getStatus();
+            res.json({ success: true, data: status });
+        } catch (error) {
+            res.json({ success: false, error: error.message });
+        }
+    });
+
+    // API: Otomatik sistemi başlat/durdur
+    app.post('/api/auto-system/:action', async (req, res) => {
+        try {
+            const { action } = req.params;
+            
+            if (action === 'start') {
+                await autoSystem.startAutoUpdate();
+                res.json({ success: true, message: 'Otomatik sistem başlatıldı' });
+            } else if (action === 'stop') {
+                autoSystem.stop();
+                res.json({ success: true, message: 'Otomatik sistem durduruldu' });
+            } else if (action === 'restart') {
+                await autoSystem.restartSystem();
+                res.json({ success: true, message: 'Sistem yeniden başlatıldı' });
+            } else {
+                res.json({ success: false, error: 'Geçersiz işlem' });
+            }
+        } catch (error) {
+            res.json({ success: false, error: error.message });
+        }
+    });
+
     server.listen(port, () => {
         console.log(`✅ Express server started at http://localhost:${port}`);
     });
-
-    // Sunucu çalışırken her 10 dakikada bir verileri güncelle
-    setInterval(() => {
-        exec('node scripts/fetch-realtime-data.js', (err) => {
-            if (err) {
-                console.error('fetch-realtime-data.js hata:', err.message);
-            } else {
-                exec('node scripts/ml-prediction.js', (err2) => {
-                    if (err2) {
-                        console.error('ml-prediction.js hata:', err2.message);
-                    }
-                });
-            }
-        });
-    }, 10 * 60 * 1000); // 10 dakika
 }
+
+// Gelişmiş otomatik sistem yönetimi
+class AutoSystemManager {
+    constructor() {
+        this.isRunning = false;
+        this.updateInterval = null;
+        this.lastUpdateTime = null;
+        this.errorCount = 0;
+        this.maxErrors = 3;
+        this.updateIntervalMs = 10 * 60 * 1000; // 10 dakika
+    }
+
+    // Otomatik güncelleme döngüsü
+    async startAutoUpdate() {
+        if (this.isRunning) {
+            console.log('⚠️ Otomatik güncelleme zaten çalışıyor');
+            return;
+        }
+
+        this.isRunning = true;
+        console.log('🤖 Otomatik güncelleme sistemi başlatıldı');
+
+        // İlk güncellemeyi hemen yap
+        await this.performUpdate();
+
+        // Periyodik güncelleme döngüsü
+        this.updateInterval = setInterval(async () => {
+            await this.performUpdate();
+        }, this.updateIntervalMs);
+    }
+
+    // Güncelleme işlemi
+    async performUpdate() {
+        try {
+            console.log('\n⏰ Otomatik güncelleme başlatılıyor...');
+            this.lastUpdateTime = new Date();
+            
+            await runScriptsSequentially([
+                'node scripts/fetch-realtime-data.js',
+                'node scripts/ml-prediction.js'
+            ]);
+            
+            console.log('✅ Otomatik güncelleme tamamlandı');
+            this.errorCount = 0; // Başarılı güncelleme sonrası hata sayacını sıfırla
+            
+        } catch (error) {
+            this.errorCount++;
+            console.error(`❌ Otomatik güncelleme hatası (${this.errorCount}/${this.maxErrors}):`, error.message);
+            
+            // Çok fazla hata varsa sistemi yeniden başlat
+            if (this.errorCount >= this.maxErrors) {
+                console.log('🔄 Çok fazla hata, sistem yeniden başlatılıyor...');
+                await this.restartSystem();
+            }
+        }
+    }
+
+    // Sistem yeniden başlatma
+    async restartSystem() {
+        try {
+            console.log('🔄 Sistem yeniden başlatılıyor...');
+            
+            // Mevcut interval'i temizle
+            if (this.updateInterval) {
+                clearInterval(this.updateInterval);
+                this.updateInterval = null;
+            }
+            
+            this.isRunning = false;
+            this.errorCount = 0;
+            
+            // 30 saniye bekle
+            await new Promise(resolve => setTimeout(resolve, 30000));
+            
+            // Sistemi yeniden başlat
+            await this.startAutoUpdate();
+            
+        } catch (error) {
+            console.error('❌ Sistem yeniden başlatma hatası:', error.message);
+        }
+    }
+
+    // Sistem durumu
+    getStatus() {
+        return {
+            isRunning: this.isRunning,
+            lastUpdateTime: this.lastUpdateTime,
+            errorCount: this.errorCount,
+            nextUpdateIn: this.isRunning ? this.updateIntervalMs : null
+        };
+    }
+
+    // Sistemi durdur
+    stop() {
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
+        this.isRunning = false;
+        console.log('🛑 Otomatik güncelleme sistemi durduruldu');
+    }
+}
+
+// Global otomatik sistem yöneticisi
+const autoSystem = new AutoSystemManager();
 
 // Sunucu + Arka plan işlemleri başlat
 async function autoSetupAndStartServer() {
     try {
+        console.log('🚀 Kahin App başlatılıyor...\n');
+        
         startExpressServer(); // Express hemen başlasın
 
+        console.log('📊 Veritabanı kontrol ediliyor...');
         runScriptSync('node db/init-db.js'); // veritabanı senkron başlat
 
         const result = await query('SELECT COUNT(*) as cnt FROM historical_data');
         const hasData = result[0].cnt > 0;
 
-        const scriptPromises = [];
-        if (!hasData) {
-            scriptPromises.push(runScriptPromise('node scripts/fetch-historical-data.js'));
-        }
-        scriptPromises.push(runScriptPromise('node scripts/fetch-realtime-data.js'));
-        scriptPromises.push(runScriptPromise('node scripts/ml-prediction.js'));
+        console.log(`📈 Mevcut veri: ${hasData ? 'Var' : 'Yok'}`);
 
-        await Promise.all(scriptPromises);
-        console.log('🚀 Otomasyon tamamlandı.');
+        if (!hasData) {
+            console.log('📥 İlk kez historical data çekiliyor...');
+            await runScriptPromise('node scripts/fetch-historical-data.js');
+        }
+
+        console.log('🔄 İlk script seti başlatılıyor...');
+        await runScriptsSequentially([
+            'node scripts/fetch-realtime-data.js',
+            'node scripts/ml-prediction.js'
+        ]);
+        
+        console.log('🎉 Kahin App başlatma tamamlandı!');
+        
+        // Otomatik sistem başlat
+        console.log('🤖 Otomatik güncelleme sistemi başlatılıyor...');
+        await autoSystem.startAutoUpdate();
+        
     } catch (error) {
-        console.error('Otomasyon hatası:', error.message);
+        console.error('❌ Başlatma hatası:', error.message);
     }
 }
 
