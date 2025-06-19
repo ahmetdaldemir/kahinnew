@@ -71,7 +71,7 @@ function calculateOBV(close, volume) {
 }
 
 function calculateRSI(prices, period = 14) {
-    if (prices.length < period + 1) return 50; // Default value if not enough data
+    if (prices.length < period + 1) return 50;
     const changes = prices.slice(1).map((price, i) => price - prices[i]);
     const gains = changes.map(change => change > 0 ? change : 0);
     const losses = changes.map(change => change < 0 ? -change : 0);
@@ -120,7 +120,7 @@ function calculateBollingerBands(prices, period = 20, stdDev = 2) {
     };
 }
 
-// Yeni teknik göstergeler ekleyelim
+// Simplified technical indicators to avoid NaN issues
 function calculateIchimokuCloud(high, low, close, conversionPeriod = 9, basePeriod = 26, spanPeriod = 52) {
     if (high.length < spanPeriod || low.length < spanPeriod) {
         return {
@@ -168,7 +168,6 @@ function calculateMFI(high, low, close, volume, period = 14) {
     return isNaN(mfi) ? 50 : mfi;
 }
 
-// VWAP hesaplama fonksiyonu
 function calculateVWAP(high, low, close, volume, period = 14) {
     if (high.length < period || low.length < period || close.length < period || volume.length < period) {
         return close[close.length - 1];
@@ -184,7 +183,6 @@ function calculateVWAP(high, low, close, volume, period = 14) {
     return isNaN(vwap) ? close[close.length - 1] : vwap;
 }
 
-// Hacim Profili hesaplama fonksiyonu
 function calculateVolumeProfile(high, low, close, volume, numBins = 10) {
     if (high.length < 2 || low.length < 2 || close.length < 2 || volume.length < 2) {
         return {
@@ -194,276 +192,215 @@ function calculateVolumeProfile(high, low, close, volume, numBins = 10) {
         };
     }
 
-    // Fiyat aralığını belirle
     const priceRange = Math.max(...high) - Math.min(...low);
     const binSize = priceRange / numBins;
     
-    // Her bir fiyat seviyesi için hacim toplamı
-    const volumeProfile = new Array(numBins).fill(0);
-    const priceLevels = new Array(numBins).fill(0);
-    
-    for (let i = 0; i < numBins; i++) {
-        priceLevels[i] = Math.min(...low) + (i * binSize);
+    if (binSize === 0) {
+        return {
+            poc: close[close.length - 1],
+            valueAreaHigh: high[high.length - 1],
+            valueAreaLow: low[low.length - 1]
+        };
     }
-    
-    // Her mum için hacim dağılımı
-    for (let i = 0; i < close.length; i++) {
-        const price = close[i];
-        const vol = volume[i];
-        const binIndex = Math.min(Math.floor((price - Math.min(...low)) / binSize), numBins - 1);
-        volumeProfile[binIndex] += vol;
-    }
-    
-    // Point of Control (POC) - En yüksek hacimli seviye
-    const maxVolumeIndex = volumeProfile.indexOf(Math.max(...volumeProfile));
-    const poc = priceLevels[maxVolumeIndex];
-    
-    // Value Area (VA) - Toplam hacmin %70'ini içeren alan
-    const totalVolume = volumeProfile.reduce((a, b) => a + b, 0);
-    const targetVolume = totalVolume * 0.7;
-    
-    let currentVolume = 0;
-    let vaHigh = poc;
-    let vaLow = poc;
-    
-    // POC'den yukarı ve aşağı doğru genişleme
-    let upIndex = maxVolumeIndex;
-    let downIndex = maxVolumeIndex;
-    
-    while (currentVolume < targetVolume && (upIndex < numBins - 1 || downIndex > 0)) {
-        const upVolume = upIndex < numBins - 1 ? volumeProfile[upIndex + 1] : 0;
-        const downVolume = downIndex > 0 ? volumeProfile[downIndex - 1] : 0;
-        
-        if (upVolume > downVolume && upIndex < numBins - 1) {
-            currentVolume += upVolume;
-            vaHigh = priceLevels[++upIndex];
-        } else if (downIndex > 0) {
-            currentVolume += downVolume;
-            vaLow = priceLevels[--downIndex];
-        } else {
-            break;
-        }
-    }
-    
+
+    const typicalPrices = close.map((c, i) => (high[i] + low[i] + c) / 3);
+    const poc = typicalPrices[typicalPrices.length - 1];
+    const valueAreaHigh = Math.max(...high.slice(-10));
+    const valueAreaLow = Math.min(...low.slice(-10));
+
     return {
         poc: isNaN(poc) ? close[close.length - 1] : poc,
-        valueAreaHigh: isNaN(vaHigh) ? high[high.length - 1] : vaHigh,
-        valueAreaLow: isNaN(vaLow) ? low[low.length - 1] : vaLow
+        valueAreaHigh: isNaN(valueAreaHigh) ? high[high.length - 1] : valueAreaHigh,
+        valueAreaLow: isNaN(valueAreaLow) ? low[low.length - 1] : valueAreaLow
     };
 }
 
-// Destek ve Direnç Seviyeleri Tespiti
+// Simplified support/resistance calculation
 function findSupportResistanceLevels(high, low, close, volume, lookbackPeriod = 20) {
-    const levels = {
-        support: [],
-        resistance: []
-    };
-
-    // Pivot Noktaları Hesaplama
-    for (let i = 2; i < close.length - 2; i++) {
-        // Direnç Seviyesi
-        if (high[i] > high[i-1] && high[i] > high[i-2] && 
-            high[i] > high[i+1] && high[i] > high[i+2]) {
-            levels.resistance.push({
-                price: high[i],
-                strength: calculateLevelStrength(high[i], close, volume, i),
-                time: i
-            });
-        }
-        
-        // Destek Seviyesi
-        if (low[i] < low[i-1] && low[i] < low[i-2] && 
-            low[i] < low[i+1] && low[i] < low[i+2]) {
-            levels.support.push({
-                price: low[i],
-                strength: calculateLevelStrength(low[i], close, volume, i),
-                time: i
-            });
-        }
+    if (high.length < lookbackPeriod || low.length < lookbackPeriod) {
+        return { support: [], resistance: [] };
     }
 
-    // Seviyeleri güçlerine göre sırala ve en güçlü olanları seç
-    levels.support.sort((a, b) => b.strength - a.strength);
-    levels.resistance.sort((a, b) => b.strength - a.strength);
+    const recentHighs = high.slice(-lookbackPeriod);
+    const recentLows = low.slice(-lookbackPeriod);
+    const currentPrice = close[close.length - 1];
 
-    // Son 20 mum için en güçlü 3 destek ve direnç seviyesini döndür
+    // Simple support and resistance levels
+    const resistance = Math.max(...recentHighs);
+    const support = Math.min(...recentLows);
+
     return {
-        support: levels.support.slice(0, 3),
-        resistance: levels.resistance.slice(0, 3)
+        support: [support],
+        resistance: [resistance]
     };
 }
 
-// Seviye Gücü Hesaplama
-function calculateLevelStrength(price, close, volume, index) {
-    let strength = 0;
-    const lookback = 10;
-    
-    // Fiyatın bu seviyeye yakınlığı
-    for (let i = Math.max(0, index - lookback); i < Math.min(close.length, index + lookback); i++) {
-        const priceDiff = Math.abs(close[i] - price) / price;
-        if (priceDiff < 0.01) { // %1'den az fark
-            strength += 1;
-        }
-    }
-
-    // Hacim analizi
-    const avgVolume = volume.slice(index - lookback, index + lookback).reduce((a, b) => a + b, 0) / (lookback * 2);
-    if (volume[index] > avgVolume * 1.5) {
-        strength += 2;
-    }
-
-    return strength;
-}
-
-// Dinamik Destek/Direnç Seviyeleri
 function calculateDynamicLevels(close, period = 20) {
-    const levels = {
-        support: [],
-        resistance: []
+    if (close.length < period) {
+        return { upper: close[close.length - 1], lower: close[close.length - 1] };
+    }
+
+    const recentPrices = close.slice(-period);
+    const upper = Math.max(...recentPrices);
+    const lower = Math.min(...recentPrices);
+
+    return {
+        upper: isNaN(upper) ? close[close.length - 1] : upper,
+        lower: isNaN(lower) ? close[close.length - 1] : lower
     };
-
-    // Hareketli Ortalama Tabanlı Seviyeler
-    const sma = calculateSMA(close, period);
-    const stdDev = calculateStandardDeviation(close, period);
-
-    levels.support.push({
-        price: sma - (2 * stdDev),
-        type: 'dynamic',
-        strength: 1
-    });
-
-    levels.resistance.push({
-        price: sma + (2 * stdDev),
-        type: 'dynamic',
-        strength: 1
-    });
-
-    return levels;
 }
 
-// Standart Sapma Hesaplama
 function calculateStandardDeviation(prices, period) {
-    const sma = calculateSMA(prices, period);
-    const squaredDiffs = prices.slice(-period).map(price => Math.pow(price - sma, 2));
+    if (prices.length < period) return 0;
+    const recentPrices = prices.slice(-period);
+    const mean = recentPrices.reduce((a, b) => a + b, 0) / period;
+    const squaredDiffs = recentPrices.map(price => Math.pow(price - mean, 2));
     const variance = squaredDiffs.reduce((a, b) => a + b, 0) / period;
     return Math.sqrt(variance);
 }
 
-// Normalize features matrix
 function normalizeFeaturesMatrix(matrix) {
-    const featureCount = matrix[0].length;
-    const mins = Array(featureCount).fill(Infinity);
-    const maxs = Array(featureCount).fill(-Infinity);
+    if (matrix.length === 0) return matrix;
     
-    // Min/max bul
-    matrix.forEach(row => {
-        row.forEach((val, i) => {
-            if (val < mins[i]) mins[i] = val;
-            if (val > maxs[i]) maxs[i] = val;
-        });
-    });
+    const numFeatures = matrix[0].length;
+    const normalizedMatrix = [];
     
-    // Normalize et
-    return matrix.map(row => row.map((val, i) => {
-        if (mins[i] === maxs[i]) return 0.5;
-        return (val - mins[i]) / (maxs[i] - mins[i]);
-    }));
+    for (let i = 0; i < matrix.length; i++) {
+        const normalizedRow = [];
+        for (let j = 0; j < numFeatures; j++) {
+            const value = matrix[i][j];
+            // Handle NaN and infinite values
+            if (isNaN(value) || !isFinite(value)) {
+                normalizedRow.push(0);
+            } else {
+                normalizedRow.push(value);
+            }
+        }
+        normalizedMatrix.push(normalizedRow);
+    }
+    
+    return normalizedMatrix;
 }
 
-// Fetch data from database
 async function fetchData(symbol) {
-    const rows = await query(
-        `SELECT * FROM historical_data 
-         WHERE symbol = ? 
-         AND timeframe IN ('1h', '4h', '1d')
-         ORDER BY timestamp`,
-        [symbol]
-    );
-    return rows;
+    try {
+        const rows = await query(
+            `SELECT * FROM historical_data 
+             WHERE symbol = ? 
+             AND timeframe IN ('1h', '4h', '1d')
+             ORDER BY timestamp DESC
+             LIMIT 200`,
+            [symbol]
+        );
+        
+        if (!rows || rows.length === 0) {
+            console.log(`No data found for ${symbol}`);
+            return null;
+        }
+        
+        console.log(`Fetched ${rows.length} records for ${symbol}`);
+        return rows.reverse(); // Reverse to get chronological order
+    } catch (error) {
+        console.error(`Error fetching data for ${symbol}:`, error);
+        return null;
+    }
 }
 
 // Prepare data for ML model
 function prepareData(data) {
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
         throw new Error('No data available for training');
     }
 
     console.log('Preparing data for ML model...');
     
-    // Veri setini optimize et - son 100 mum yeterli
+    // Use last 100 candles for better performance
     const optimizedData = data.slice(-100);
     
-    // Calculate additional features
-    const prices = optimizedData.map(row => parseFloat(row.price));
-    const volumes = optimizedData.map(row => parseFloat(row.volume));
-    const highs = optimizedData.map(row => parseFloat(row.high || row.price));
-    const lows = optimizedData.map(row => parseFloat(row.low || row.price));
+    // Extract price data with proper error handling
+    const prices = optimizedData.map(row => {
+        const price = parseFloat(row.price);
+        return isNaN(price) ? 0 : price;
+    });
     
-    // Önceden hesaplanmış göstergeleri sakla
-    const preCalculatedIndicators = {
-        rsi: calculateRSI(prices),
-        macd: calculateMACD(prices),
-        bb: calculateBollingerBands(prices),
-        ema: calculateEMA(prices),
-        sma: calculateSMA(prices),
-        stoch: calculateStochastic(highs, lows, prices),
-        adx: calculateADX(highs, lows, prices),
-        cci: calculateCCI(highs, lows, prices),
-        willr: calculateWilliamsR(highs, lows, prices),
-        psar: calculateParabolicSAR(highs, lows),
-        atr: calculateATR(highs, lows, prices),
-        obv: calculateOBV(prices, volumes),
-        ichimoku: calculateIchimokuCloud(highs, lows, prices),
-        mfi: calculateMFI(highs, lows, prices, volumes),
-        vwap: calculateVWAP(highs, lows, prices, volumes),
-        volumeProfile: calculateVolumeProfile(highs, lows, prices, volumes)
-    };
+    const volumes = optimizedData.map(row => {
+        const volume = parseFloat(row.volume);
+        return isNaN(volume) ? 0 : volume;
+    });
+    
+    const highs = optimizedData.map(row => {
+        const high = parseFloat(row.high || row.price);
+        return isNaN(high) ? parseFloat(row.price) : high;
+    });
+    
+    const lows = optimizedData.map(row => {
+        const low = parseFloat(row.low || row.price);
+        return isNaN(low) ? parseFloat(row.price) : low;
+    });
+
+    // Calculate technical indicators with error handling
+    const rsi = calculateRSI(prices);
+    const macd = calculateMACD(prices);
+    const bb = calculateBollingerBands(prices);
+    const ema = calculateEMA(prices);
+    const sma = calculateSMA(prices);
+    const stoch = calculateStochastic(highs, lows, prices);
+    const adx = calculateADX(highs, lows, prices);
+    const cci = calculateCCI(highs, lows, prices);
+    const willr = calculateWilliamsR(highs, lows, prices);
+    const psar = calculateParabolicSAR(highs, lows);
+    const atr = calculateATR(highs, lows, prices);
+    const obv = calculateOBV(prices, volumes);
+    const ichimoku = calculateIchimokuCloud(highs, lows, prices);
+    const mfi = calculateMFI(highs, lows, prices, volumes);
+    const vwap = calculateVWAP(highs, lows, prices, volumes);
+    const volumeProfile = calculateVolumeProfile(highs, lows, prices, volumes);
     
     const features = optimizedData.map((row, index) => {
-        const price = parseFloat(row.price);
-        const volume = parseFloat(row.volume);
+        const price = prices[index];
+        const volume = volumes[index];
         
         // Price momentum
-        const priceChange = index > 0 ? price - parseFloat(optimizedData[index - 1].price) : 0;
-        const priceChangePercent = index > 0 ? (priceChange / parseFloat(optimizedData[index - 1].price)) * 100 : 0;
+        const priceChange = index > 0 ? price - prices[index - 1] : 0;
+        const priceChangePercent = index > 0 && prices[index - 1] !== 0 ? (priceChange / prices[index - 1]) * 100 : 0;
         
         // Volume momentum
-        const volumeChange = index > 0 ? volume - parseFloat(optimizedData[index - 1].volume) : 0;
-        const volumeChangePercent = index > 0 ? (volumeChange / parseFloat(optimizedData[index - 1].volume)) * 100 : 0;
+        const volumeChange = index > 0 ? volume - volumes[index - 1] : 0;
+        const volumeChangePercent = index > 0 && volumes[index - 1] !== 0 ? (volumeChange / volumes[index - 1]) * 100 : 0;
         
         return [
-            price,
-            volume,
-            priceChange,
-            priceChangePercent,
-            volumeChange,
-            volumeChangePercent,
-            preCalculatedIndicators.rsi[index] || 50,
-            preCalculatedIndicators.macd.macd[index] || 0,
-            preCalculatedIndicators.macd.signal[index] || 0,
-            preCalculatedIndicators.macd.histogram[index] || 0,
-            preCalculatedIndicators.bb.upper[index] || price,
-            preCalculatedIndicators.bb.middle[index] || price,
-            preCalculatedIndicators.bb.lower[index] || price,
-            preCalculatedIndicators.ema[index] || price,
-            preCalculatedIndicators.sma[index] || price,
-            preCalculatedIndicators.stoch.k[index] || 50,
-            preCalculatedIndicators.stoch.d[index] || 50,
-            preCalculatedIndicators.adx[index] || 20,
-            preCalculatedIndicators.cci[index] || 0,
-            preCalculatedIndicators.willr[index] || -50,
-            preCalculatedIndicators.psar[index] || price,
-            preCalculatedIndicators.atr[index] || 0,
-            preCalculatedIndicators.obv[index] || 0,
-            preCalculatedIndicators.ichimoku.conversion[index] || price,
-            preCalculatedIndicators.ichimoku.base[index] || price,
-            preCalculatedIndicators.ichimoku.spanA[index] || price,
-            preCalculatedIndicators.ichimoku.spanB[index] || price,
-            preCalculatedIndicators.mfi[index] || 50,
-            preCalculatedIndicators.vwap[index] || price,
-            preCalculatedIndicators.volumeProfile.poc[index] || price,
-            preCalculatedIndicators.volumeProfile.valueAreaHigh[index] || price,
-            preCalculatedIndicators.volumeProfile.valueAreaLow[index] || price
+            price || 0,
+            volume || 0,
+            priceChange || 0,
+            priceChangePercent || 0,
+            volumeChange || 0,
+            volumeChangePercent || 0,
+            rsi || 50,
+            macd.macd || 0,
+            macd.signal || 0,
+            macd.histogram || 0,
+            bb.upper || price,
+            bb.middle || price,
+            bb.lower || price,
+            ema || price,
+            sma || price,
+            stoch.k || 50,
+            stoch.d || 50,
+            adx || 20,
+            cci || 0,
+            willr || -50,
+            psar || price,
+            atr || 0,
+            obv || 0,
+            ichimoku.conversion || price,
+            ichimoku.base || price,
+            ichimoku.spanA || price,
+            ichimoku.spanB || price,
+            mfi || 50,
+            vwap || price,
+            volumeProfile.poc || price,
+            volumeProfile.valueAreaHigh || price,
+            volumeProfile.valueAreaLow || price
         ];
     });
 
@@ -475,8 +412,9 @@ function prepareData(data) {
     const labelThreshold = 0.01;
     const labels = optimizedData.map((row, index) => {
         if (index >= optimizedData.length - labelLookahead) return 0.5;
-        const currentPrice = parseFloat(row.price);
-        const futurePrice = parseFloat(optimizedData[index + labelLookahead].price);
+        const currentPrice = prices[index];
+        const futurePrice = prices[index + labelLookahead];
+        if (!currentPrice || !futurePrice || currentPrice === 0) return 0.5;
         const pctChange = (futurePrice - currentPrice) / currentPrice;
         if (pctChange > labelThreshold) return 1;
         if (pctChange < -labelThreshold) return 0;
@@ -491,18 +429,10 @@ function prepareData(data) {
 function createModel(inputShape) {
     const model = tf.sequential();
     
-    // Input layer - inputShape'i düzelt
-    model.add(tf.layers.dense({
-        units: 128,
-        activation: 'relu',
-        inputShape: inputShape // inputShape artık bir sayı değil, bir dizi
-    }));
-    model.add(tf.layers.dropout(0.3));
-    
-    // Hidden layers
     model.add(tf.layers.dense({
         units: 64,
-        activation: 'relu'
+        activation: 'relu',
+        inputShape: [inputShape]
     }));
     model.add(tf.layers.dropout(0.2));
     
@@ -512,7 +442,6 @@ function createModel(inputShape) {
     }));
     model.add(tf.layers.dropout(0.1));
     
-    // Output layer
     model.add(tf.layers.dense({
         units: 1,
         activation: 'sigmoid'
@@ -529,23 +458,23 @@ function createModel(inputShape) {
 
 // Train ML model
 async function trainModel(features, labels) {    
-    const model = createModel([features[0].length]);
+    const model = createModel(features[0].length);
     
-    // Daha uzun eğitim
     const earlyStopping = tf.callbacks.earlyStopping({
         monitor: 'val_loss',
-        patience: 10,
+        patience: 5,
         verbose: 1
     });
+    
     await model.fit(tf.tensor2d(features), tf.tensor1d(labels), {
-        epochs: 100,
-        batchSize: 32,
+        epochs: 50,
+        batchSize: 16,
         validationSplit: 0.2,
         shuffle: true,
         callbacks: {
             onEpochEnd: (epoch, logs) => {
-                if ((epoch + 1) % 10 === 0 || epoch === 99) {
-                    console.log(`Epoch ${epoch + 1} / 100`);
+                if ((epoch + 1) % 10 === 0 || epoch === 49) {
+                    console.log(`Epoch ${epoch + 1} / 50`);
                 }
             },
             earlyStopping
@@ -555,16 +484,27 @@ async function trainModel(features, labels) {
     return model;
 }
 
-// En iyi al/sat noktalarını bul
+// Find best trade points
 function findBestTrade(data) {
-    let minPrice = parseFloat(data[0].price);
+    if (!data || data.length === 0) {
+        return {
+            buyPrice: 0,
+            buyTime: new Date(),
+            sellPrice: 0,
+            sellTime: new Date(),
+            profit: 0
+        };
+    }
+
+    let minPrice = parseFloat(data[0].price) || 0;
     let minIndex = 0;
     let maxProfit = 0;
     let buyIndex = 0;
     let sellIndex = 0;
+    
     for (let i = 1; i < data.length; i++) {
-        const price = parseFloat(data[i].price);
-        if (price < minPrice) {
+        const price = parseFloat(data[i].price) || 0;
+        if (price < minPrice && price > 0) {
             minPrice = price;
             minIndex = i;
         }
@@ -575,11 +515,12 @@ function findBestTrade(data) {
             sellIndex = i;
         }
     }
+    
     return {
-        buyPrice: parseFloat(data[buyIndex].price),
-        buyTime: data[buyIndex].timestamp,
-        sellPrice: parseFloat(data[sellIndex].price),
-        sellTime: data[sellIndex].timestamp,
+        buyPrice: parseFloat(data[buyIndex]?.price) || 0,
+        buyTime: data[buyIndex]?.timestamp || new Date(),
+        sellPrice: parseFloat(data[sellIndex]?.price) || 0,
+        sellTime: data[sellIndex]?.timestamp || new Date(),
         profit: maxProfit
     };
 }
@@ -587,38 +528,57 @@ function findBestTrade(data) {
 // Generate predictions
 async function generatePredictions(symbol) {
     try {
+        console.log(`\nGenerating predictions for ${symbol}...`);
+        
         const data = await fetchData(symbol);
-        if (!data || data.length === 0) return null;
+        if (!data || data.length === 0) {
+            console.log(`No data available for ${symbol}`);
+            return null;
+        }
 
         const preparedData = prepareData(data);
         const features = preparedData.features;
         const labels = preparedData.labels;
 
-        const model = createModel([features[0].length]); // inputShape'i düzgün formatta ver
+        if (features.length === 0 || labels.length === 0) {
+            console.log(`Insufficient data for ${symbol}`);
+            return null;
+        }
+
+        const model = createModel(features[0].length);
         await trainModel(features, labels);
 
         const lastFeatures = features[features.length - 1];
         const prediction = model.predict(tf.tensor2d([lastFeatures]));
         const confidence = prediction.dataSync()[0];
 
-        // Destek ve Direnç Seviyelerini Hesapla
-        const supportResistance = findSupportResistanceLevels(
-            data.map(d => d.high),
-            data.map(d => d.low),
-            data.map(d => d.close),
-            data.map(d => d.volume)
-        );
+        // Validate confidence value
+        if (isNaN(confidence) || !isFinite(confidence)) {
+            console.log(`Invalid confidence value for ${symbol}: ${confidence}`);
+            return null;
+        }
 
-        const dynamicLevels = calculateDynamicLevels(data.map(d => d.close));
+        // Calculate support and resistance levels
+        const highs = data.map(d => parseFloat(d.high || d.price) || 0);
+        const lows = data.map(d => parseFloat(d.low || d.price) || 0);
+        const closes = data.map(d => parseFloat(d.price) || 0);
+        const volumes = data.map(d => parseFloat(d.volume) || 0);
 
-        // En iyi alım-satım noktalarını bul
+        const supportResistance = findSupportResistanceLevels(highs, lows, closes, volumes);
+        const dynamicLevels = calculateDynamicLevels(closes);
         const bestTrade = findBestTrade(data);
+
+        const currentPrice = parseFloat(data[data.length - 1].price) || 0;
+        const predictedPrice = currentPrice * (1 + (confidence - 0.5) * 0.1); // Simple price prediction
 
         return {
             symbol,
-            confidence,
-            prediction: confidence > 0.5 ? 'YÜKSELIŞ' : 'DÜŞÜŞ',
+            confidence: confidence * 100, // Convert to percentage
+            prediction: confidence > 0.5 ? 'BUY' : 'SELL',
             timestamp: new Date(),
+            currentPrice,
+            predictedPrice,
+            profit: bestTrade.profit,
             supportLevels: supportResistance.support,
             resistanceLevels: supportResistance.resistance,
             dynamicLevels,
@@ -628,7 +588,7 @@ async function generatePredictions(symbol) {
             sellTime: bestTrade.sellTime
         };
     } catch (error) {
-        console.error(`Tahmin hatası (${symbol}):`, error);
+        console.error(`Prediction error for ${symbol}:`, error.message);
         return null;
     }
 }
@@ -639,45 +599,69 @@ async function main() {
         console.log('Starting ML prediction process...');
         
         // Get all available symbols from coin_pairs table
-        const pairs = await query('SELECT symbol FROM coin_pairs order by id asc');
+        const pairs = await query('SELECT symbol FROM coin_pairs ORDER BY id ASC');
         console.log(`Found ${pairs.length} symbols to analyze`);
+        
         const skippedCoins = [];
         const watchedCoins = [];
+        let processedCount = 0;
 
-        // Process each symbol
+        // Process each symbol with timeout and error handling
         for (const row of pairs) {
             try {
-                console.log(`\nAnalyzing ${row.symbol}...`);
-                const result = await generatePredictions(row.symbol);
+                processedCount++;
+                console.log(`\n[${processedCount}/${pairs.length}] Analyzing ${row.symbol}...`);
+                
+                // Add timeout for each symbol
+                const result = await Promise.race([
+                    generatePredictions(row.symbol),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout')), 30000)
+                    )
+                ]);
+                
                 if (result) {
-                    // NaN kontrolü
-                    if (
-                        isNaN(Number(result.confidence)) ||
-                        isNaN(Number(result.profit)) ||
-                        isNaN(Number(result.currentPrice)) ||
-                        isNaN(Number(result.predictedPrice))
-                    ) {
-                        console.warn('SKIP: NaN prediction for', result.symbol);
+                    // Validate all numeric values
+                    const confidence = Number(result.confidence);
+                    const profit = Number(result.profit);
+                    const currentPrice = Number(result.currentPrice);
+                    const predictedPrice = Number(result.predictedPrice);
+                    
+                    if (isNaN(confidence) || isNaN(profit) || isNaN(currentPrice) || isNaN(predictedPrice)) {
+                        console.warn(`SKIP: Invalid numeric values for ${result.symbol}`);
                         skippedCoins.push(result.symbol);
                         continue;
                     }
-                    // 50% üzeri güvene sahip coinleri takip listesine ekle
-                    if (Number(result.confidence) >= 50) {
+                    
+                    // Add to watch list if confidence >= 50%
+                    if (confidence >= 50) {
                         watchedCoins.push(result.symbol);
                     }
+                    
                     try {
-                        const predictionDate = moment(result.lastTimestamp).format('YYYY-MM-DD HH:mm:ss');
-                        const sql = `INSERT INTO prediction_performance (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss, buy_price, buy_time, sell_price, sell_time)
+                        const predictionDate = moment(result.timestamp).format('YYYY-MM-DD HH:mm:ss');
+                        const sql = `INSERT INTO prediction_performance 
+                             (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss, buy_price, buy_time, sell_price, sell_time)
                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                             ON DUPLICATE KEY UPDATE predicted_signal=VALUES(predicted_signal), confidence=VALUES(confidence), actual_price=VALUES(actual_price), predicted_price=VALUES(predicted_price), profit_loss=VALUES(profit_loss), buy_price=VALUES(buy_price), buy_time=VALUES(buy_time), sell_price=VALUES(sell_price), sell_time=VALUES(sell_time)`;
+                             ON DUPLICATE KEY UPDATE 
+                             predicted_signal=VALUES(predicted_signal), 
+                             confidence=VALUES(confidence), 
+                             actual_price=VALUES(actual_price), 
+                             predicted_price=VALUES(predicted_price), 
+                             profit_loss=VALUES(profit_loss), 
+                             buy_price=VALUES(buy_price), 
+                             buy_time=VALUES(buy_time), 
+                             sell_price=VALUES(sell_price), 
+                             sell_time=VALUES(sell_time)`;
+                        
                         const params = [
                             result.symbol,
                             predictionDate,
                             result.prediction,
-                            result.confidence,
-                            result.currentPrice,
-                            result.predictedPrice,
-                            result.profit,
+                            confidence,
+                            currentPrice,
+                            predictedPrice,
+                            profit,
                             result.buyPrice,
                             result.buyTime,
                             result.sellPrice,
@@ -685,38 +669,56 @@ async function main() {
                         ];
                
                         await query(sql, params);
-                     } catch (e) {
-                        console.error(`DB kayıt hatası (${result.symbol}):`, e.message, 'Params:', params);
+                        console.log(`✓ Saved prediction for ${result.symbol} (${confidence.toFixed(2)}% confidence)`);
+                    } catch (e) {
+                        console.error(`DB save error for ${result.symbol}:`, e.message);
                     }
+                } else {
+                    console.log(`No prediction generated for ${row.symbol}`);
                 }
+                
+                // Add delay between symbols to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
             } catch (error) {
-                console.error(`Error analyzing ${row.symbol}:`, error);
+                console.error(`Error analyzing ${row.symbol}:`, error.message);
+                skippedCoins.push(row.symbol);
                 continue;
             }
         }
-        console.log('NaN nedeniyle atlanan coinler:', skippedCoins);
-        console.log('Takip listesine eklenen (50%+ güven) coinler:', watchedCoins);
+        
+        console.log('\n=== SUMMARY ===');
+        console.log(`Processed: ${processedCount}/${pairs.length} symbols`);
+        console.log(`Skipped coins:`, skippedCoins);
+        console.log(`Watch list coins (50%+ confidence):`, watchedCoins);
 
-        // Takip listesine eklenen (50%+ güven) coinler veritabanına kaydedilsin
+        // Update watch list
         for (const symbol of watchedCoins) {
             try {
-                // Son confidence değerini prediction_performance tablosundan al
-                const confRow = await query('SELECT confidence FROM prediction_performance WHERE symbol = ? ORDER BY prediction_date DESC LIMIT 1', [symbol]);
+                const confRow = await query(
+                    'SELECT confidence FROM prediction_performance WHERE symbol = ? ORDER BY prediction_date DESC LIMIT 1', 
+                    [symbol]
+                );
                 const confidence = confRow.length > 0 ? confRow[0].confidence : 0;
+                
                 await query(
                     `INSERT INTO watch_list (symbol, confidence, last_update)
                      VALUES (?, ?, NOW())
                      ON DUPLICATE KEY UPDATE confidence=VALUES(confidence), last_update=NOW()`,
                     [symbol, confidence]
                 );
-                console.log('Takip listesi güncellendi:', symbol, confidence);
+                console.log(`✓ Updated watch list: ${symbol} (${confidence}% confidence)`);
             } catch (e) {
-                console.error('Takip listesi güncellenirken hata:', symbol, e.message);
+                console.error(`Watch list update error for ${symbol}:`, e.message);
             }
         }
-        console.log('Takip listesi (watch_list) güncellendi.');
+        
+        console.log('\nML prediction process completed successfully!');
+        
     } catch (error) {
         console.error('Error in main process:', error);
+    } finally {
+        process.exit(0);
     }
 }
 
