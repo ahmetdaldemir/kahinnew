@@ -581,9 +581,9 @@ async function generatePredictions(symbol) {
         const trainAccuracy = history.history.acc ? history.history.acc[history.history.acc.length - 1] : 0.5;
         
         // Calculate realistic confidence based on model performance
-        const baseConfidence = Math.min(valAccuracy, trainAccuracy);
-        const overfittingPenalty = Math.max(0, trainAccuracy - valAccuracy) * 0.5;
-        const realisticConfidence = Math.max(0.1, Math.min(0.95, baseConfidence - overfittingPenalty));
+        const baseConfidence = Math.min(valAccuracy * 0.8, trainAccuracy * 0.8); // Reduce base confidence
+        const overfittingPenalty = Math.max(0, trainAccuracy - valAccuracy) * 0.8; // Increase penalty
+        let realisticConfidence = Math.max(0.1, Math.min(0.9, baseConfidence - overfittingPenalty));
 
         // Make prediction
         const lastFeatures = features[features.length - 1];
@@ -596,15 +596,22 @@ async function generatePredictions(symbol) {
             return null;
         }
 
-        // Calculate final confidence with realistic bounds
-        const finalConfidence = Math.max(10, Math.min(90, realisticConfidence * 100));
+        // Calculate final confidence with more conservative bounds
+        const signalStrength = Math.abs(rawConfidence - 0.5) * 2; // 0 to 1
+        realisticConfidence = realisticConfidence * (0.7 + signalStrength * 0.3); // Adjust based on signal strength
+        const finalConfidence = Math.max(10, Math.min(75, realisticConfidence * 100)); // Cap at 75%
         
         // Determine signal based on confidence and trend
         let signal = 'HOLD';
+        const strongSignalThreshold = 0.65;
+        const weakSignalThreshold = 0.55;
+        
         if (finalConfidence > 60) {
-            signal = rawConfidence > 0.5 ? 'BUY' : 'SELL';
+            if (rawConfidence > strongSignalThreshold) signal = 'BUY';
+            else if (rawConfidence < (1 - strongSignalThreshold)) signal = 'SELL';
         } else if (finalConfidence > 40) {
-            signal = rawConfidence > 0.6 ? 'BUY' : rawConfidence < 0.4 ? 'SELL' : 'HOLD';
+            if (rawConfidence > weakSignalThreshold) signal = 'BUY';
+            else if (rawConfidence < (1 - weakSignalThreshold)) signal = 'SELL';
         }
 
         // Calculate support and resistance levels
@@ -620,10 +627,12 @@ async function generatePredictions(symbol) {
         const currentPrice = parseFloat(data[data.length - 1].price) || 0;
         
         // Calculate more realistic price prediction
-        const priceChange = (rawConfidence - 0.5) * 0.05; // Max 5% change
+        const volatility = calculateStandardDeviation(closes, 20) / currentPrice;
+        const maxChange = Math.min(volatility * 2, 0.03); // Cap at 3%
+        const priceChange = (rawConfidence - 0.5) * maxChange;
         const predictedPrice = currentPrice * (1 + priceChange);
 
-        // Calculate profit potential
+        // Calculate profit potential based on volatility
         const profitPotential = Math.abs(priceChange) * 100;
 
         console.log(`✓ ${symbol}: ${finalConfidence.toFixed(1)}% confidence, ${signal} signal, ${profitPotential.toFixed(2)}% potential`);

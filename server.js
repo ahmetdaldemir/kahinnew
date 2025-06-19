@@ -146,7 +146,20 @@ function startExpressServer() {
             const highProfitCoins = await fetchHighProfitCoins();
             const topProfitCoins = await fetchTopProfitCoins();
             const topConfidenceCoins = await fetchTopConfidenceCoins();
-            const watchList = await query('SELECT * FROM watch_list ORDER BY confidence DESC');
+            
+            // Gelişmiş watch list verisi
+            const watchList = await query(`
+                SELECT w.*, p.predicted_signal, p.actual_price, p.predicted_price, 
+                       p.buy_price, p.buy_time, p.sell_price, p.sell_time, p.profit_loss
+                FROM watch_list w
+                LEFT JOIN prediction_performance p ON w.symbol = p.symbol 
+                    AND p.prediction_date = (
+                        SELECT MAX(prediction_date) 
+                        FROM prediction_performance 
+                        WHERE symbol = w.symbol
+                    )
+                ORDER BY w.confidence DESC
+            `);
 
             const lastUpdate = new Date().toLocaleString('tr-TR', {
                 year: 'numeric',
@@ -226,7 +239,18 @@ function startExpressServer() {
     // API: İzleme listesi (watch_list)
     app.get('/api/watch-list', async (req, res) => {
         try {
-            const watchList = await query('SELECT * FROM watch_list where confidence >= 30 and confidence <= 100 ORDER BY confidence DESC LIMIT 20');
+            const watchList = await query(`
+                SELECT w.*, p.predicted_signal, p.actual_price, p.predicted_price, 
+                       p.buy_price, p.buy_time, p.sell_price, p.sell_time, p.profit_loss
+                FROM watch_list w
+                LEFT JOIN prediction_performance p ON w.symbol = p.symbol 
+                    AND p.prediction_date = (
+                        SELECT MAX(prediction_date) 
+                        FROM prediction_performance 
+                        WHERE symbol = w.symbol
+                    )
+                ORDER BY w.confidence DESC
+            `);
             res.json({ success: true, data: watchList });
         } catch (error) {
             res.json({ success: false, error: error.message });

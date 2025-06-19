@@ -81,6 +81,11 @@
                                     <tr>
                                         <th>Sembol</th>
                                         <th>Güven Oranı</th>
+                                        <th>Sinyal</th>
+                                        <th>Güncel Fiyat</th>
+                                        <th>Alım Fiyatı</th>
+                                        <th>Satış Fiyatı</th>
+                                        <th>Kar Potansiyeli</th>
                                         <th>Son Güncelleme</th>
                                     </tr>
                                 </thead>
@@ -91,6 +96,45 @@
                                             <td><strong><%= coin.symbol %></strong></td>
                                             <td class="<%= coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 50 ? 'confidence-medium' : 'confidence-low' %>">
                                                 <%= parseFloat(coin.confidence).toFixed(2) %>%
+                                            </td>
+                                            <td>
+                                                <% if (coin.predicted_signal) { %>
+                                                    <span class="badge bg-<%= coin.predicted_signal === 'BUY' ? 'success' : coin.predicted_signal === 'SELL' ? 'danger' : 'warning' %>">
+                                                        <%= coin.predicted_signal %>
+                                                    </span>
+                                                <% } else { %>
+                                                    <span class="badge bg-secondary">HOLD</span>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <% if (coin.actual_price) { %>
+                                                    $<%= parseFloat(coin.actual_price).toFixed(4) %>
+                                                <% } else { %>
+                                                    <span class="text-muted">-</span>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <% if (coin.buy_price) { %>
+                                                    <span class="text-success">$<%= parseFloat(coin.buy_price).toFixed(4) %></span>
+                                                <% } else { %>
+                                                    <span class="text-muted">-</span>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <% if (coin.sell_price) { %>
+                                                    <span class="text-danger">$<%= parseFloat(coin.sell_price).toFixed(4) %></span>
+                                                <% } else { %>
+                                                    <span class="text-muted">-</span>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <% if (coin.profit_loss) { %>
+                                                    <span class="<%= parseFloat(coin.profit_loss) >= 0 ? 'text-success' : 'text-danger' %>">
+                                                        <%= parseFloat(coin.profit_loss).toFixed(2) %>%
+                                                    </span>
+                                                <% } else { %>
+                                                    <span class="text-muted">-</span>
+                                                <% } %>
                                             </td>
                                             <td><%= new Date(coin.last_update).toLocaleString('tr-TR') %></td>
                                         </tr>
@@ -307,12 +351,37 @@
                         tbody.innerHTML = '';
                         json.data.forEach(coin => {
                             const tvSymbol = coin.symbol.replace('/', '');
+                            const signalBadge = coin.predicted_signal ? 
+                                `<span class="badge bg-${coin.predicted_signal === 'BUY' ? 'success' : coin.predicted_signal === 'SELL' ? 'danger' : 'warning'}">${coin.predicted_signal}</span>` :
+                                '<span class="badge bg-secondary">HOLD</span>';
+                            
+                            const currentPrice = coin.actual_price ? 
+                                `$${parseFloat(coin.actual_price).toFixed(4)}` : 
+                                '<span class="text-muted">-</span>';
+                            
+                            const buyPrice = coin.buy_price ? 
+                                `<span class="text-success">$${parseFloat(coin.buy_price).toFixed(4)}</span>` : 
+                                '<span class="text-muted">-</span>';
+                            
+                            const sellPrice = coin.sell_price ? 
+                                `<span class="text-danger">$${parseFloat(coin.sell_price).toFixed(4)}</span>` : 
+                                '<span class="text-muted">-</span>';
+                            
+                            const profitLoss = coin.profit_loss ? 
+                                `<span class="${parseFloat(coin.profit_loss) >= 0 ? 'text-success' : 'text-danger'}">${parseFloat(coin.profit_loss).toFixed(2)}%</span>` : 
+                                '<span class="text-muted">-</span>';
+                            
                             tbody.innerHTML += `
                                 <tr style="cursor:pointer" onclick="showChartModal('${tvSymbol}')">
                                     <td><strong>${coin.symbol}</strong></td>
                                     <td class="${coin.confidence >= 70 ? 'confidence-high' : coin.confidence >= 50 ? 'confidence-medium' : 'confidence-low'}">
                                         ${parseFloat(coin.confidence).toFixed(2)}%
                                     </td>
+                                    <td>${signalBadge}</td>
+                                    <td>${currentPrice}</td>
+                                    <td>${buyPrice}</td>
+                                    <td>${sellPrice}</td>
+                                    <td>${profitLoss}</td>
                                     <td>${new Date(coin.last_update).toLocaleString('tr-TR')}</td>
                                 </tr>
                             `;

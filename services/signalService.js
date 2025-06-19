@@ -16,9 +16,31 @@ class SignalService {
             const buyTime = now.format('DD/MM/YYYY HH:mm');
             const sellTime = now.add(30, 'minutes').format('DD/MM/YYYY HH:mm');
             
+            // Fiyat null veya undefined ise API'den al
+            if (!currentPrice) {
+                try {
+                    const priceData = await query(
+                        'SELECT price FROM historical_data WHERE symbol = ? ORDER BY timestamp DESC LIMIT 1',
+                        [symbol]
+                    );
+                    if (priceData && priceData[0]) {
+                        currentPrice = parseFloat(priceData[0].price);
+                    }
+                } catch (error) {
+                    console.error(`Fiyat verisi alınamadı ${symbol}:`, error);
+                }
+            }
+
+            // Fiyat hala yoksa sinyal oluşturma
+            if (!currentPrice) {
+                console.warn(`${symbol} için fiyat verisi bulunamadı`);
+                return null;
+            }
+            
             // Alım-satım fiyatlarını hesapla
             const buyPrice = this.calculateBuyPrice(currentPrice, prediction.confidence);
             const sellPrice = this.calculateSellPrice(buyPrice, prediction.profit);
+            const profitPotential = ((sellPrice - buyPrice) / buyPrice) * 100;
             
             // Destek ve direnç seviyeleri
             const levels = await this.calculateSupportResistance(symbol);
@@ -27,12 +49,12 @@ class SignalService {
                 symbol: symbol,
                 signal: prediction.signal,
                 confidence: prediction.confidence,
-                currentPrice: currentPrice,
-                buyPrice: buyPrice,
-                sellPrice: sellPrice,
+                currentPrice: currentPrice.toFixed(4),
+                buyPrice: buyPrice.toFixed(4),
+                sellPrice: sellPrice.toFixed(4),
                 buyTime: buyTime,
                 sellTime: sellTime,
-                profit: prediction.profit,
+                profit: profitPotential.toFixed(2),
                 supportLevels: levels.support,
                 resistanceLevels: levels.resistance,
                 riskLevel: this.calculateRiskLevel(prediction.confidence),
@@ -49,15 +71,16 @@ class SignalService {
 
     // Alım fiyatı hesapla
     calculateBuyPrice(currentPrice, confidence) {
-        const volatility = 0.02; // %2 volatilite
-        const confidenceMultiplier = confidence / 100;
-        const adjustment = currentPrice * volatility * confidenceMultiplier;
-        return currentPrice + adjustment;
+        // Güven oranına göre spread ayarla
+        const spread = Math.max(0.001, (100 - confidence) / 1000); // Minimum 0.1% spread
+        return currentPrice * (1 - spread);
     }
 
     // Satış fiyatı hesapla
-    calculateSellPrice(buyPrice, profit) {
-        return buyPrice * (1 + profit / 100);
+    calculateSellPrice(buyPrice, expectedProfit) {
+        // Beklenen kar en az %0.5, en fazla %5 olsun
+        const profit = Math.min(Math.max(expectedProfit, 0.5), 5) / 100;
+        return buyPrice * (1 + profit);
     }
 
     // Destek ve direnç seviyeleri hesapla
@@ -125,13 +148,42 @@ class SignalService {
     // Telegram'a sinyal gönder
     async sendTelegramSignal(signal) {
         if (!this.telegramBotToken || !this.telegramChatId) {
-            console.warn('Telegram bot token veya chat ID eksik');
+            console.warn('⚠️ Telegram bot token veya chat ID eksik');
+            return false;
+        }
+
+        // Token ve Chat ID formatını kontrol et
+        if (!/^[0-9]+:[A-Za-z0-9_-]{35,}$/.test(this.telegramBotToken)) {
+            console.warn('⚠️ Geçersiz Telegram bot token formatı');
+            return false;
+        }
+
+        if (!this.telegramChatId.startsWith('-') && !this.telegramChatId.match(/^\d+$/)) {
+            console.warn('⚠️ Geçersiz Telegram chat ID formatı');
             return false;
         }
 
         try {
             const message = this.formatTelegramMessage(signal);
             
+            // Mesaj uzunluğunu kontrol et (Telegram limiti: 4096 karakter)
+            if (message.length > 4000) {
+                console.warn(`⚠️ Mesaj çok uzun (${message.length} karakter), kısaltılıyor...`);
+                const shortenedMessage = message.substring(0, 4000) + '\n\n⚠️ Mesaj kısaltıldı...';
+                return await this.sendTelegramMessage(shortenedMessage);
+            }
+            
+            return await this.sendTelegramMessage(message);
+            
+        } catch (error) {
+            console.error('❌ Telegram sinyal gönderme hatası:', error.message);
+            return false;
+        }
+    }
+
+    // Telegram mesajını gönder
+    async sendTelegramMessage(message) {
+        try {
             const response = await axios.post(
                 `https://api.telegram.org/bot${this.telegramBotToken}/sendMessage`,
                 {
@@ -141,19 +193,26 @@ class SignalService {
                     disable_web_page_preview: true
                 },
                 {
-                    timeout: 10000
+                    timeout: 10000,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 }
             );
 
             if (response.data.ok) {
-                console.log(`✅ Telegram sinyali gönderildi: ${signal.symbol}`);
+                console.log(`✅ Telegram sinyali gönderildi`);
                 return true;
             } else {
-                console.error('Telegram API hatası:', response.data);
+                console.error('❌ Telegram API hatası:', response.data);
                 return false;
             }
         } catch (error) {
-            console.error('Telegram sinyal gönderme hatası:', error.message);
+            if (error.response) {
+                console.error(`❌ Telegram API Hatası (${error.response.status}):`, error.response.data);
+            } else {
+                console.error('❌ Telegram bağlantı hatası:', error.message);
+            }
             return false;
         }
     }
@@ -169,15 +228,15 @@ class SignalService {
         message += `⚠️ <b>Risk Seviyesi:</b> ${signal.riskLevel}\n\n`;
         
         if (signal.signal === 'BUY') {
-            message += `💰 <b>Alım Fiyatı:</b> $${signal.buyPrice.toFixed(4)}\n`;
+            message += `💰 <b>Alım Fiyatı:</b> $${signal.buyPrice}\n`;
             message += `📅 <b>Alım Zamanı:</b> ${signal.buyTime}\n`;
-            message += `🎯 <b>Hedef Satış:</b> $${signal.sellPrice.toFixed(4)}\n`;
+            message += `🎯 <b>Hedef Satış:</b> $${signal.sellPrice}\n`;
             message += `📅 <b>Satış Zamanı:</b> ${signal.sellTime}\n`;
-            message += `📈 <b>Beklenen Kar:</b> ${signal.profit.toFixed(2)}%\n\n`;
+            message += `📈 <b>Beklenen Kar:</b> ${signal.profit}%\n\n`;
         } else {
-            message += `💰 <b>Satış Fiyatı:</b> $${signal.sellPrice.toFixed(4)}\n`;
+            message += `💰 <b>Satış Fiyatı:</b> $${signal.sellPrice}\n`;
             message += `📅 <b>Satış Zamanı:</b> ${signal.sellTime}\n`;
-            message += `📉 <b>Beklenen Kar:</b> ${signal.profit.toFixed(2)}%\n\n`;
+            message += `📉 <b>Beklenen Kar:</b> ${signal.profit}%\n\n`;
         }
         
         message += `🛑 <b>Stop Loss:</b> $${signal.stopLoss.toFixed(4)}\n`;
@@ -199,7 +258,7 @@ class SignalService {
             message += '\n';
         }
         
-        message += `⏰ <b>Güncel Fiyat:</b> $${signal.currentPrice.toFixed(4)}\n`;
+        message += `⏰ <b>Güncel Fiyat:</b> $${signal.currentPrice}\n`;
         message += `🕐 <b>Sinyal Zamanı:</b> ${moment().format('DD/MM/YYYY HH:mm:ss')}\n\n`;
         message += `⚠️ <i>Bu sinyal yatırım tavsiyesi değildir. Kendi araştırmanızı yapın.</i>`;
         
@@ -211,7 +270,7 @@ class SignalService {
         try {
             console.log('🔍 Tüm coinler için detaylı sinyaller oluşturuluyor...');
             
-            // Son tahminleri al
+            // Son tahminleri al - düzeltilmiş sorgu
             const predictions = await query(`
                 SELECT p.*, h.price as current_price
                 FROM prediction_performance p
@@ -225,9 +284,7 @@ class SignalService {
                     )
                 ) h ON p.symbol = h.symbol
                 WHERE p.confidence >= ?
-                AND p.prediction_date = (
-                    SELECT MAX(prediction_date) FROM prediction_performance
-                )
+                AND p.prediction_date >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
                 ORDER BY p.confidence DESC, p.profit_loss DESC
             `, [this.signalThreshold]);
 
