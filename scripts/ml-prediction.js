@@ -545,17 +545,66 @@ async function generatePredictions(symbol) {
             return null;
         }
 
-        const model = createModel(features[0].length);
-        await trainModel(features, labels);
+        // Minimum data requirement
+        if (features.length < 10) {
+            console.log(`Insufficient data for ${symbol}: ${features.length} samples`);
+            return null;
+        }
 
+        const model = createModel(features[0].length);
+        
+        // Train model with validation
+        const validationSplit = 0.3;
+        const trainSize = Math.floor(features.length * (1 - validationSplit));
+        
+        const trainFeatures = features.slice(0, trainSize);
+        const trainLabels = labels.slice(0, trainSize);
+        const valFeatures = features.slice(trainSize);
+        const valLabels = labels.slice(trainSize);
+
+        if (trainFeatures.length < 5 || valFeatures.length < 2) {
+            console.log(`Insufficient training data for ${symbol}`);
+            return null;
+        }
+
+        // Train model
+        const history = await model.fit(tf.tensor2d(trainFeatures), tf.tensor1d(trainLabels), {
+            epochs: 30,
+            batchSize: Math.min(8, trainFeatures.length),
+            validationData: [tf.tensor2d(valFeatures), tf.tensor1d(valLabels)],
+            shuffle: true,
+            verbose: 0
+        });
+
+        // Get validation accuracy for confidence calculation
+        const valAccuracy = history.history.val_acc ? history.history.val_acc[history.history.val_acc.length - 1] : 0.5;
+        const trainAccuracy = history.history.acc ? history.history.acc[history.history.acc.length - 1] : 0.5;
+        
+        // Calculate realistic confidence based on model performance
+        const baseConfidence = Math.min(valAccuracy, trainAccuracy);
+        const overfittingPenalty = Math.max(0, trainAccuracy - valAccuracy) * 0.5;
+        const realisticConfidence = Math.max(0.1, Math.min(0.95, baseConfidence - overfittingPenalty));
+
+        // Make prediction
         const lastFeatures = features[features.length - 1];
         const prediction = model.predict(tf.tensor2d([lastFeatures]));
-        const confidence = prediction.dataSync()[0];
+        const rawConfidence = prediction.dataSync()[0];
 
         // Validate confidence value
-        if (isNaN(confidence) || !isFinite(confidence)) {
-            console.log(`Invalid confidence value for ${symbol}: ${confidence}`);
+        if (isNaN(rawConfidence) || !isFinite(rawConfidence)) {
+            console.log(`Invalid confidence value for ${symbol}: ${rawConfidence}`);
             return null;
+        }
+
+        // Calculate final confidence with realistic bounds
+        const finalConfidence = Math.max(10, Math.min(90, realisticConfidence * 100));
+        
+        // Determine signal based on confidence and trend
+        let signal = 'HOLD';
+        if (finalConfidence > 60) {
+            signal = rawConfidence > 0.5 ? 'BUY' : 'SELL';
+        } else if (finalConfidence > 40) {
+            signal = rawConfidence > 0.6 ? 'BUY' : rawConfidence < 0.4 ? 'SELL' : 'HOLD';
         }
 
         // Calculate support and resistance levels
@@ -569,16 +618,24 @@ async function generatePredictions(symbol) {
         const bestTrade = findBestTrade(data);
 
         const currentPrice = parseFloat(data[data.length - 1].price) || 0;
-        const predictedPrice = currentPrice * (1 + (confidence - 0.5) * 0.1); // Simple price prediction
+        
+        // Calculate more realistic price prediction
+        const priceChange = (rawConfidence - 0.5) * 0.05; // Max 5% change
+        const predictedPrice = currentPrice * (1 + priceChange);
+
+        // Calculate profit potential
+        const profitPotential = Math.abs(priceChange) * 100;
+
+        console.log(`✓ ${symbol}: ${finalConfidence.toFixed(1)}% confidence, ${signal} signal, ${profitPotential.toFixed(2)}% potential`);
 
         return {
             symbol,
-            confidence: confidence * 100, // Convert to percentage
-            prediction: confidence > 0.5 ? 'BUY' : 'SELL',
+            confidence: finalConfidence,
+            prediction: signal,
             timestamp: new Date(),
             currentPrice,
             predictedPrice,
-            profit: bestTrade.profit,
+            profit: profitPotential,
             supportLevels: supportResistance.support,
             resistanceLevels: supportResistance.resistance,
             dynamicLevels,

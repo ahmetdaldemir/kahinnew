@@ -17,7 +17,10 @@
     "auto:install": "pm2 install pm2-logrotate && pm2 set pm2-logrotate:max_size 10M && pm2 set pm2-logrotate:retain 7",
     "init-db": "node init-db.js",
     "fetch-historical": "node scripts/fetch-historical-data.js",
-    "fetch-realtime": "node scripts/fetch-realtime-data.js"
+    "fetch-realtime": "node scripts/fetch-realtime-data.js",
+    "ml-prediction": "node scripts/ml-prediction.js",
+    "generate-signals": "node scripts/generate-signals.js",
+    "signals": "node scripts/generate-signals.js"
   },
   "dependencies": {
     "@tensorflow/tfjs-node": "^4.22.0",

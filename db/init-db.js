@@ -83,6 +83,32 @@ async function initDatabase() {
         `);
         console.log('support_resistance_levels tablosu oluşturuldu');
 
+        // Trading Sinyalleri Tablosu
+        await query(`
+            CREATE TABLE IF NOT EXISTS trading_signals (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                symbol VARCHAR(20) NOT NULL,
+                signal_type ENUM('BUY', 'SELL', 'HOLD') NOT NULL,
+                confidence DECIMAL(5,2) NOT NULL,
+                buy_price DECIMAL(20,8),
+                sell_price DECIMAL(20,8),
+                buy_time VARCHAR(20),
+                sell_time VARCHAR(20),
+                profit DECIMAL(10,2),
+                stop_loss DECIMAL(20,8),
+                take_profit DECIMAL(20,8),
+                support_levels TEXT,
+                resistance_levels TEXT,
+                risk_level ENUM('DÜŞÜK', 'ORTA', 'YÜKSEK'),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_symbol (symbol),
+                INDEX idx_signal_type (signal_type),
+                INDEX idx_confidence (confidence),
+                INDEX idx_created_at (created_at)
+            )
+        `);
+        console.log('trading_signals tablosu oluşturuldu');
+
         console.log('Tüm tablolar başarıyla oluşturuldu!');
         process.exit(0);
     } catch (error) {

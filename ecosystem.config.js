@@ -50,6 +50,12 @@ module.exports = {
     script: 'scripts/ml-prediction.js',
     cron_restart: '*/10 * * * *', // Her 10 dakikada bir otomatik başlat
     autorestart: false
+  },
+  {
+    name: 'generate-signals',
+    script: 'scripts/generate-signals.js',
+    cron_restart: '*/15 * * * *', // Her 15 dakikada bir otomatik başlat
+    autorestart: false
   }
 ]
 };

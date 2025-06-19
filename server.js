@@ -5,6 +5,7 @@ const { spawn, execSync, exec } = require('child_process');
 const { query } = require('./db/db'); 
 
 const {  fetchHighConfidenceCoins, fetchHighProfitCoins, fetchTopProfitCoins, fetchTopConfidenceCoins } = require('./scripts/dashboard');
+const SignalService = require('./services/signalService');
 const http = require('http');
 const socketIo = require('socket.io');
 const axios = require('axios');
@@ -284,6 +285,74 @@ function startExpressServer() {
         }
     });
 
+    // API: Sinyal oluştur
+    app.post('/api/generate-signals', async (req, res) => {
+        try {
+            console.log('🔍 Detaylı sinyaller oluşturuluyor...');
+            const signalService = new SignalService();
+            const signals = await signalService.generateAllSignals();
+            
+            res.json({ 
+                success: true, 
+                message: `${signals.length} sinyal oluşturuldu`,
+                signals: signals
+            });
+        } catch (error) {
+            console.error('❌ Sinyal oluşturma hatası:', error);
+            res.json({ success: false, error: error.message });
+        }
+    });
+
+    // API: Son sinyalleri getir
+    app.get('/api/latest-signals', async (req, res) => {
+        try {
+            const signals = await query(`
+                SELECT * FROM trading_signals 
+                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                ORDER BY created_at DESC
+                LIMIT 50
+            `);
+            
+            res.json({ success: true, data: signals });
+        } catch (error) {
+            res.json({ success: false, error: error.message });
+        }
+    });
+
+    // API: Belirli coin için sinyalleri getir
+    app.get('/api/signals/:symbol', async (req, res) => {
+        try {
+            const { symbol } = req.params;
+            const signals = await query(`
+                SELECT * FROM trading_signals 
+                WHERE symbol = ? 
+                ORDER BY created_at DESC 
+                LIMIT 20
+            `, [symbol]);
+            
+            res.json({ success: true, data: signals });
+        } catch (error) {
+            res.json({ success: false, error: error.message });
+        }
+    });
+
+    // API: Yüksek güvenli sinyalleri getir
+    app.get('/api/high-confidence-signals', async (req, res) => {
+        try {
+            const signals = await query(`
+                SELECT * FROM trading_signals 
+                WHERE confidence >= 70 
+                AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                ORDER BY confidence DESC, created_at DESC
+                LIMIT 20
+            `);
+            
+            res.json({ success: true, data: signals });
+        } catch (error) {
+            res.json({ success: false, error: error.message });
+        }
+    });
+
     server.listen(port, () => {
         console.log(`✅ Express server started at http://localhost:${port}`);
     });
@@ -329,6 +398,11 @@ class AutoSystemManager {
                 'node scripts/fetch-realtime-data.js',
                 'node scripts/ml-prediction.js'
             ]);
+            
+            // Sinyal oluştur
+            console.log('🔍 Sinyaller oluşturuluyor...');
+            const signalService = new SignalService();
+            await signalService.generateAllSignals();
             
             console.log('✅ Otomatik güncelleme tamamlandı');
             this.errorCount = 0; // Başarılı güncelleme sonrası hata sayacını sıfırla
