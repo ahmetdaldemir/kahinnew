@@ -1,6 +1,11 @@
 require('dotenv').config();
 const tf = require('@tensorflow/tfjs-node');
 const { query } = require('../db/db'); 
+const fibonacciIndicators = require('./fibonacci-indicators');
+const harmonicPatterns = require('./harmonic-patterns');
+const advancedMomentum = require('./advanced-momentum');
+const volatilityAnalysis = require('./volatility-analysis');
+const riskManagement = require('./risk-management');
 
 const moment = require('moment');
 const ti = require('technicalindicators');
@@ -356,6 +361,27 @@ function prepareData(data) {
     const vwap = calculateVWAP(highs, lows, prices, volumes);
     const volumeProfile = calculateVolumeProfile(highs, lows, prices, volumes);
     
+    // Calculate Fibonacci indicators
+    const fibRetracement = fibonacciIndicators.calculateFibonacciRetracement(highs, lows);
+    const fibExtension = fibonacciIndicators.calculateFibonacciExtension(highs, lows, prices);
+    const fibTimeZones = fibonacciIndicators.calculateFibonacciTimeZones(prices);
+    const fibFan = fibonacciIndicators.calculateFibonacciFan(highs, lows, prices);
+    const fibArc = fibonacciIndicators.calculateFibonacciArc(highs, lows, prices);
+    const fibStrength = fibonacciIndicators.calculateFibonacciStrength(highs, lows, prices);
+    const goldenRatio = fibonacciIndicators.calculateGoldenRatioAnalysis(highs, lows, prices);
+    
+    // Calculate Harmonic Patterns
+    const harmonicAnalysis = harmonicPatterns.analyzeHarmonicPatterns(highs, lows, prices);
+    
+    // Calculate Advanced Momentum Indicators
+    const momentumAnalysis = advancedMomentum.analyzeMomentum(highs, lows, prices, volumes);
+    
+    // Calculate Volatility Analysis
+    const volatilityAnalysis = volatilityAnalysis.analyzeVolatility(highs, lows, prices, volumes);
+    
+    // Calculate Risk Management Metrics
+    const riskAnalysis = riskManagement.analyzeRisk(prices);
+    
     const features = optimizedData.map((row, index) => {
         const price = prices[index];
         const volume = volumes[index];
@@ -400,7 +426,98 @@ function prepareData(data) {
             vwap || price,
             volumeProfile.poc || price,
             volumeProfile.valueAreaHigh || price,
-            volumeProfile.valueAreaLow || price
+            volumeProfile.valueAreaLow || price,
+            // Fibonacci Retracement Levels
+            fibRetracement.level0 || price,
+            fibRetracement.level236 || price,
+            fibRetracement.level382 || price,
+            fibRetracement.level500 || price,
+            fibRetracement.level618 || price,
+            fibRetracement.level786 || price,
+            fibRetracement.level100 || price,
+            // Fibonacci Extension Levels
+            fibExtension.ext1272 || price,
+            fibExtension.ext1618 || price,
+            fibExtension.ext2618 || price,
+            fibExtension.ext4236 || price,
+            // Fibonacci Time Zones
+            fibTimeZones.timeZone1 || price,
+            fibTimeZones.timeZone2 || price,
+            fibTimeZones.timeZone3 || price,
+            fibTimeZones.timeZone5 || price,
+            fibTimeZones.timeZone8 || price,
+            fibTimeZones.timeZone13 || price,
+            // Fibonacci Fan Lines
+            fibFan.fan236 || price,
+            fibFan.fan382 || price,
+            fibFan.fan500 || price,
+            fibFan.fan618 || price,
+            fibFan.fan786 || price,
+            // Fibonacci Arc Levels
+            fibArc.arc236 || price,
+            fibArc.arc382 || price,
+            fibArc.arc500 || price,
+            fibArc.arc618 || price,
+            // Fibonacci Strength Analysis
+            fibStrength.supportStrength || 0,
+            fibStrength.resistanceStrength || 0,
+            fibStrength.nearestLevel || price,
+            fibStrength.levelDistance || 0,
+            // Golden Ratio Analysis
+            goldenRatio.goldenRatio || 1.618,
+            goldenRatio.goldenRatioInverse || 0.618,
+            goldenRatio.priceToGoldenRatio || 1,
+            goldenRatio.goldenRatioStrength || 0,
+            // Harmonic Patterns
+            harmonicAnalysis.strongestConfidence || 0,
+            harmonicAnalysis.hasPattern ? 1 : 0,
+            harmonicAnalysis.patternCount || 0,
+            // Advanced Momentum Indicators
+            momentumAnalysis.roc || 0,
+            momentumAnalysis.momentum || 0,
+            momentumAnalysis.cci || 0,
+            momentumAnalysis.williamsR || -50,
+            momentumAnalysis.stochRSI.k || 50,
+            momentumAnalysis.stochRSI.d || 50,
+            momentumAnalysis.ultimateOsc || 50,
+            momentumAnalysis.mfi || 50,
+            momentumAnalysis.tsi || 0,
+            momentumAnalysis.cmo || 0,
+            momentumAnalysis.dpo || 0,
+            momentumAnalysis.momentumStrength || 0,
+            momentumAnalysis.isBullish ? 1 : 0,
+            momentumAnalysis.isBearish ? 1 : 0,
+            // Volatility Analysis
+            volatilityAnalysis.historicalVol || 0,
+            volatilityAnalysis.parkinsonVol || 0,
+            volatilityAnalysis.garmanKlassVol || 0,
+            volatilityAnalysis.rogersSatchellVol || 0,
+            volatilityAnalysis.atr || 0,
+            volatilityAnalysis.volRatio || 1,
+            volatilityAnalysis.chaikinVol || 0,
+            volatilityAnalysis.vix || 0,
+            volatilityAnalysis.bbWidth || 0,
+            volatilityAnalysis.keltnerWidth || 0,
+            volatilityAnalysis.breakout.isBreakout ? 1 : 0,
+            volatilityAnalysis.breakout.strength || 0,
+            volatilityAnalysis.isHighVolatility ? 1 : 0,
+            volatilityAnalysis.isLowVolatility ? 1 : 0,
+            volatilityAnalysis.isVolatilityIncreasing ? 1 : 0,
+            volatilityAnalysis.isVolatilityDecreasing ? 1 : 0,
+            // Risk Management
+            riskAnalysis.var95 || 0,
+            riskAnalysis.var99 || 0,
+            riskAnalysis.cvar95 || 0,
+            riskAnalysis.maxDrawdown || 0,
+            riskAnalysis.sharpeRatio || 0,
+            riskAnalysis.sortinoRatio || 0,
+            riskAnalysis.calmarRatio || 0,
+            riskAnalysis.riskAdjustedReturn || 0,
+            riskAnalysis.volatility || 0,
+            riskAnalysis.riskLevel === 'high' ? 1 : riskAnalysis.riskLevel === 'medium' ? 0.5 : 0,
+            riskAnalysis.isHighRisk ? 1 : 0,
+            riskAnalysis.isLowRisk ? 1 : 0,
+            riskAnalysis.riskScore || 0
         ];
     });
 
@@ -624,6 +741,18 @@ async function generatePredictions(symbol) {
         const dynamicLevels = calculateDynamicLevels(closes);
         const bestTrade = findBestTrade(data);
 
+        // Calculate Fibonacci levels for enhanced analysis
+        const fibRetracement = fibonacciIndicators.calculateFibonacciRetracement(highs, lows);
+        const fibExtension = fibonacciIndicators.calculateFibonacciExtension(highs, lows, closes);
+        const fibStrength = fibonacciIndicators.calculateFibonacciStrength(highs, lows, closes);
+        const goldenRatio = fibonacciIndicators.calculateGoldenRatioAnalysis(highs, lows, closes);
+
+        // Calculate advanced analyses
+        const harmonicAnalysis = harmonicPatterns.analyzeHarmonicPatterns(highs, lows, closes);
+        const momentumAnalysis = advancedMomentum.analyzeMomentum(highs, lows, closes, volumes);
+        const volatilityAnalysis = volatilityAnalysis.analyzeVolatility(highs, lows, closes, volumes);
+        const riskAnalysis = riskManagement.analyzeRisk(closes);
+
         const currentPrice = parseFloat(data[data.length - 1].price) || 0;
         
         // Calculate more realistic price prediction
@@ -635,19 +764,55 @@ async function generatePredictions(symbol) {
         // Calculate profit potential based on volatility
         const profitPotential = Math.abs(priceChange) * 100;
 
-        console.log(`✓ ${symbol}: ${finalConfidence.toFixed(1)}% confidence, ${signal} signal, ${profitPotential.toFixed(2)}% potential`);
+        // Enhanced Fibonacci-based analysis
+        const fibLevels = [
+            fibRetracement.level0, fibRetracement.level236, fibRetracement.level382,
+            fibRetracement.level500, fibRetracement.level618, fibRetracement.level786, fibRetracement.level100
+        ];
+        
+        // Find nearest Fibonacci support and resistance
+        const nearestFibSupport = Math.max(...fibLevels.filter(level => level <= currentPrice));
+        const nearestFibResistance = Math.min(...fibLevels.filter(level => level >= currentPrice));
+        
+        // Calculate enhanced confidence with multiple factors
+        const fibConfidenceBoost = fibStrength.goldenRatioStrength * 10; // Up to 10% boost
+        const harmonicConfidenceBoost = harmonicAnalysis.strongestConfidence * 0.1; // Up to 10% boost
+        const momentumConfidenceBoost = momentumAnalysis.momentumStrength * 0.05; // Up to 5% boost
+        const volatilityConfidenceBoost = volatilityAnalysis.isLowVolatility ? 5 : volatilityAnalysis.isHighVolatility ? -5 : 0; // Volatility adjustment
+        const riskConfidenceBoost = riskAnalysis.isLowRisk ? 3 : riskAnalysis.isHighRisk ? -3 : 0; // Risk adjustment
+        
+        const totalConfidenceBoost = fibConfidenceBoost + harmonicConfidenceBoost + momentumConfidenceBoost + 
+                                   volatilityConfidenceBoost + riskConfidenceBoost;
+        const enhancedConfidence = Math.min(90, Math.max(10, finalConfidence + totalConfidenceBoost));
+
+        console.log(`✓ ${symbol}: ${enhancedConfidence.toFixed(1)}% confidence, ${signal} signal, ${profitPotential.toFixed(2)}% potential`);
+        console.log(`  Fibonacci: Support ${nearestFibSupport.toFixed(4)}, Resistance ${nearestFibResistance.toFixed(4)}, Strength ${(fibStrength.goldenRatioStrength * 100).toFixed(1)}%`);
+        console.log(`  Harmonic: ${harmonicAnalysis.strongestPattern} (${harmonicAnalysis.strongestConfidence.toFixed(1)}%), Momentum: ${momentumAnalysis.isBullish ? 'Bullish' : momentumAnalysis.isBearish ? 'Bearish' : 'Neutral'}`);
+        console.log(`  Volatility: ${volatilityAnalysis.volRegime}, Risk: ${riskAnalysis.riskLevel}, VIX: ${volatilityAnalysis.vix.toFixed(1)}`);
 
         return {
             symbol,
-            confidence: finalConfidence,
+            confidence: enhancedConfidence,
             prediction: signal,
             timestamp: new Date(),
             currentPrice,
             predictedPrice,
             profit: profitPotential,
-            supportLevels: supportResistance.support,
-            resistanceLevels: supportResistance.resistance,
+            supportLevels: [...supportResistance.support, nearestFibSupport],
+            resistanceLevels: [...supportResistance.resistance, nearestFibResistance],
             dynamicLevels,
+            fibonacciLevels: {
+                retracement: fibRetracement,
+                extension: fibExtension,
+                strength: fibStrength,
+                goldenRatio: goldenRatio,
+                nearestSupport: nearestFibSupport,
+                nearestResistance: nearestFibResistance
+            },
+            harmonicPatterns: harmonicAnalysis,
+            momentumAnalysis: momentumAnalysis,
+            volatilityAnalysis: volatilityAnalysis,
+            riskAnalysis: riskAnalysis,
             buyPrice: bestTrade.buyPrice,
             buyTime: bestTrade.buyTime,
             sellPrice: bestTrade.sellPrice,
@@ -707,8 +872,14 @@ async function main() {
                     try {
                         const predictionDate = moment(result.timestamp).format('YYYY-MM-DD HH:mm:ss');
                         const sql = `INSERT INTO prediction_performance 
-                             (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss, buy_price, buy_time, sell_price, sell_time)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             (symbol, prediction_date, predicted_signal, confidence, actual_price, predicted_price, profit_loss, 
+                              buy_price, buy_time, sell_price, sell_time,
+                              fib_level_0, fib_level_236, fib_level_382, fib_level_500, fib_level_618, fib_level_786, fib_level_100,
+                              fib_ext_1272, fib_ext_1618, fib_ext_2618, fib_ext_4236,
+                              fib_support_strength, fib_resistance_strength, fib_nearest_level, fib_level_distance,
+                              fib_golden_ratio_strength, fib_nearest_support, fib_nearest_resistance,
+                              fib_confidence_boost, enhanced_confidence)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                              ON DUPLICATE KEY UPDATE 
                              predicted_signal=VALUES(predicted_signal), 
                              confidence=VALUES(confidence), 
@@ -718,7 +889,27 @@ async function main() {
                              buy_price=VALUES(buy_price), 
                              buy_time=VALUES(buy_time), 
                              sell_price=VALUES(sell_price), 
-                             sell_time=VALUES(sell_time)`;
+                             sell_time=VALUES(sell_time),
+                             fib_level_0=VALUES(fib_level_0),
+                             fib_level_236=VALUES(fib_level_236),
+                             fib_level_382=VALUES(fib_level_382),
+                             fib_level_500=VALUES(fib_level_500),
+                             fib_level_618=VALUES(fib_level_618),
+                             fib_level_786=VALUES(fib_level_786),
+                             fib_level_100=VALUES(fib_level_100),
+                             fib_ext_1272=VALUES(fib_ext_1272),
+                             fib_ext_1618=VALUES(fib_ext_1618),
+                             fib_ext_2618=VALUES(fib_ext_2618),
+                             fib_ext_4236=VALUES(fib_ext_4236),
+                             fib_support_strength=VALUES(fib_support_strength),
+                             fib_resistance_strength=VALUES(fib_resistance_strength),
+                             fib_nearest_level=VALUES(fib_nearest_level),
+                             fib_level_distance=VALUES(fib_level_distance),
+                             fib_golden_ratio_strength=VALUES(fib_golden_ratio_strength),
+                             fib_nearest_support=VALUES(fib_nearest_support),
+                             fib_nearest_resistance=VALUES(fib_nearest_resistance),
+                             fib_confidence_boost=VALUES(fib_confidence_boost),
+                             enhanced_confidence=VALUES(enhanced_confidence)`;
                         
                         const params = [
                             result.symbol,
@@ -731,11 +922,35 @@ async function main() {
                             result.buyPrice,
                             result.buyTime,
                             result.sellPrice,
-                            result.sellTime
+                            result.sellTime,
+                            // Fibonacci Retracement Levels
+                            result.fibonacciLevels.retracement.level0,
+                            result.fibonacciLevels.retracement.level236,
+                            result.fibonacciLevels.retracement.level382,
+                            result.fibonacciLevels.retracement.level500,
+                            result.fibonacciLevels.retracement.level618,
+                            result.fibonacciLevels.retracement.level786,
+                            result.fibonacciLevels.retracement.level100,
+                            // Fibonacci Extension Levels
+                            result.fibonacciLevels.extension.ext1272,
+                            result.fibonacciLevels.extension.ext1618,
+                            result.fibonacciLevels.extension.ext2618,
+                            result.fibonacciLevels.extension.ext4236,
+                            // Fibonacci Analysis
+                            result.fibonacciLevels.strength.supportStrength,
+                            result.fibonacciLevels.strength.resistanceStrength,
+                            result.fibonacciLevels.strength.nearestLevel,
+                            result.fibonacciLevels.strength.levelDistance,
+                            result.fibonacciLevels.goldenRatio.goldenRatioStrength,
+                            result.fibonacciLevels.nearestSupport,
+                            result.fibonacciLevels.nearestResistance,
+                            // Fibonacci Confidence Boost
+                            fibConfidenceBoost,
+                            enhancedConfidence
                         ];
                
                         await query(sql, params);
-                        console.log(`✓ Saved prediction for ${result.symbol} (${confidence.toFixed(2)}% confidence)`);
+                        console.log(`✓ Saved prediction for ${result.symbol} (${enhancedConfidence.toFixed(2)}% confidence)`);
                     } catch (e) {
                         console.error(`DB save error for ${result.symbol}:`, e.message);
                     }
