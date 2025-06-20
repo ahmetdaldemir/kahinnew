@@ -249,7 +249,8 @@ function startExpressServer() {
                         FROM prediction_performance 
                         WHERE symbol = w.symbol
                     )
-                ORDER BY w.confidence DESC
+                WHERE w.confidence >= 50 AND w.confidence <= 100
+                ORDER BY w.confidence DESC LIMIT 30
             `);
             res.json({ success: true, data: watchList });
         } catch (error) {
